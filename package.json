@@ -1,0 +1,40 @@
+{
+  "name": "barmeto-product-research",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev --webpack --port 3006",
+    "build": "next build --webpack",
+    "start": "next start --port 3006",
+    "lint": "eslint",
+    "test": "node --import ./tests/register.mjs --test tests/*.test.mjs",
+    "scraper:check": "node --env-file=.env --import ./tests/register.mjs scripts/check-scraper.mjs"
+  },
+  "dependencies": {
+    "@vercel/blob": "^2.4.0",
+    "bcryptjs": "^3.0.3",
+    "chart.js": "^4.6.2",
+    "exceljs": "^4.4.0",
+    "joi": "^18.2.8",
+    "jose": "^6.2.3",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.8",
+    "lucide-react": "^1.17.0",
+    "nanoid": "^5.1.11",
+    "next": "16.4.6",
+    "node-html-parser": "^7.1.0",
+    "nodemailer": "^10.0.15",
+    "posthog-js": "^1.453.0",
+    "react": "19.2.4",
+    "react-chartjs-2": "^5.3.1",
+    "react-dom": "19.2.4",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "eslint": "^9",
+    "eslint-config-next": "16.4.6",
+    "tailwindcss": "^4"
+  }
+}
