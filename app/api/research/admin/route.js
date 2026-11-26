@@ -7,8 +7,8 @@ export const maxDuration = 300
 
 const TRIM_DAYS = [30, 90, 180, 365]
 
-// POST — the master admin's storage actions (Settings › All data):
-//   { action: 'clean-unused' }              delete data no user's search uses, stop its daily reads
+// POST — the master admin's storage actions (New Search page › All data):
+//   { action: 'clean-unused' }              delete saved data no entry uses (and old per-user search lists)
 //   { action: 'trim', days: 30|90|180|365 } delete every snapshot older than that
 //   { action: 'wipe', confirm: 'DELETE' }    delete ALL Product Research data (accounts and coins are the hub's — untouched)
 // → { ok, result, storage } (storage = the summary after it).

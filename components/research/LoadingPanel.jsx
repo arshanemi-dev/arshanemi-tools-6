@@ -36,7 +36,7 @@ function JobRow({ job }) {
   let text;
   if (job.state === 'reading') {
     icon = <Loader2 size={15} className="animate-spin text-link" />;
-    text = job.page ? `Page ${job.page} of ${job.pages} read · ${products} so far` : 'Opening the first page…';
+    text = job.page ? `Page ${job.page} of ${job.pages} read${job.added != null ? ` (+${job.added} new)` : ''} · ${products} so far` : 'Opening the first page…';
   } else if (job.state === 'done') {
     icon = <CheckCircle2 size={15} className="text-[color:var(--move-up)]" />;
     text = `Done · ${products}`;

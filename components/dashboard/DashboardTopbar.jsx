@@ -2,14 +2,16 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
+import { usePathname } from 'next/navigation';
 import UserMenu from './UserMenu';
 import { redirectToLogin } from '@/lib/authGate';
 
-// The dark navbar: logo, a centered "Product Research" label, and login / account.
-// (Previously showed the full data/nav.js multi-tool link row.) `user` is
+// The dark navbar: logo, one link — Product Research — and login / account
+// (the master admin's New Search page is in the account menu). `user` is
 // undefined until the browser has read the stored session (useStoredUser) —
 // an empty slot then, so neither "Log in" nor the menu flashes the wrong way.
 export default function DashboardTopbar({ user, onLogout }) {
+  const pathname = usePathname() || '';
   return (
     <header className="sticky top-0 z-50 flex-shrink-0 border-b border-white/10 bg-footer">
       <div className="w-full px-4 sm:px-6 lg:px-10">
@@ -18,10 +20,14 @@ export default function DashboardTopbar({ user, onLogout }) {
             <Image src="/images/barmeto-logo.png" alt="Barmeto" width={132} height={40} className="h-9 w-auto rounded-lg" priority />
           </Link>
 
-          <nav className="flex min-w-0 flex-1 items-center justify-center">
-            <span className="whitespace-nowrap text-sm font-semibold text-white underline underline-offset-8 decoration-2">
+          <nav aria-label="Product Research" className="flex min-w-0 flex-1 items-center justify-center">
+            <Link
+              href="/product-research"
+              aria-current={pathname === '/product-research' ? 'page' : undefined}
+              className="whitespace-nowrap text-sm font-semibold text-white underline decoration-2 underline-offset-8"
+            >
               Product Research
-            </span>
+            </Link>
           </nav>
 
           <div className="flex shrink-0 items-center gap-3">

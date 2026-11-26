@@ -46,6 +46,8 @@ export default function ResearchTable({
   selectedKeys = null, onToggleRow, onToggleAll, onView, totalLabel = 'Total',
   // What ticking means here — the dashboard: "in the graphs"; Settings: "to delete".
   tickPurpose = 'in the graphs', tickedSummary = 'in graphs',
+  // Rows drawn first, outside sorting / filters / paging (an editable new row).
+  pinnedRows = [],
 }) {
   const [sort, setSort] = useState(defaultSort);
   const [filters, setFilters] = useState({});
@@ -141,7 +143,18 @@ export default function ResearchTable({
             )}
           </thead>
           <tbody>
-            {view.length === 0 && (
+            {/* Pinned rows (a new row being added): always first, never sorted, filtered or paged. */}
+            {pinnedRows.map((r) => (
+              <tr key={r.key} data-active="true">
+                {selectable && <td className="px-2 py-2" />}
+                {columns.map((col) => (
+                  <td key={col.key} className={`px-3 py-2 ${col.wrap ? '' : 'whitespace-nowrap'} ${col.tone?.(r) || 'text-foreground'}`}>
+                    {col.render ? col.render(r) : col.text(r)}
+                  </td>
+                ))}
+              </tr>
+            ))}
+            {view.length === 0 && !pinnedRows.length && (
               <tr>
                 <td colSpan={columns.length + (selectable ? 1 : 0)} className="px-4 py-10 text-center text-sm text-muted">
                   {rows.length === 0 ? emptyText : 'No rows match the current filters.'}

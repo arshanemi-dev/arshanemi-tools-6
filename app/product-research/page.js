@@ -2,14 +2,16 @@ import { ToastProvider } from '@/components/admin/Toast';
 import ResearchShell from '@/components/research/ResearchShell';
 
 export const metadata = {
-  title: 'Product Research',
+  title: 'Daily History',
 };
 
-// Thin shell — everything lives in <ResearchShell/> (client).
+// The home page: the filters row + the Daily History table
+// (components/research/DailyHistoryPage.jsx). Products and Settings are
+// their own pages.
 export default function ProductResearchPage() {
   return (
     <ToastProvider>
-      <ResearchShell />
+      <ResearchShell page="daily" />
     </ToastProvider>
   );
 }

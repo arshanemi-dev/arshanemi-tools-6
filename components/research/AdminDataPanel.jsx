@@ -7,10 +7,10 @@ import ConfirmDialog from '@/components/admin/ConfirmDialog';
 import { adminAction } from '@/lib/research/apiClient';
 import { fmtInt } from '@/lib/research/format';
 
-// Settings › All data — the master admin only (the API checks the role too).
+// New Search › All data — the master admin only (the API checks the role too).
 // Storage numbers, then three tools, each confirmed first:
-//   Clean up    — data no user's search uses any more, and its daily reads
-//                 (scraping credits spent every day for nobody).
+//   Clean up    — saved data no entry uses any more (and the old per-user
+//                 search lists, already turned into entries).
 //   Old history — every snapshot older than 30 / 90 / 180 / 365 days.
 //   Everything  — all Product Research data (type DELETE). Accounts and coins
 //                 live in the admin panel and are not touched.
@@ -29,7 +29,7 @@ function Stat({ label, value, sub }) {
 }
 
 function resultText(action, r) {
-  if (action === 'clean-unused') return r.deletedTracks ? `Removed ${fmtInt(r.deletedTracks)} unused saved lists (${size(r.freedBytes)}) · ${fmtInt(r.dailyReads)} daily reads left` : `Nothing unused to remove · ${fmtInt(r.dailyReads)} daily reads`;
+  if (action === 'clean-unused') return r.deletedTracks ? `Removed ${fmtInt(r.deletedTracks)} unused saved lists (${size(r.freedBytes)})` : 'Nothing unused to remove';
   if (action === 'trim') return r.snapshots ? `Deleted ${fmtInt(r.snapshots)} old daily snapshots in ${fmtInt(r.tracks)} lists${r.products ? ` · ${fmtInt(r.products)} products had none left and went` : ''}` : 'No snapshots that old — nothing deleted';
   return `Deleted all Product Research data (${fmtInt(r.deleted)} files, ${size(r.bytes)})`;
 }
@@ -40,8 +40,8 @@ export default function AdminDataPanel({ storage: initial, onChanged }) {
   const [days, setDays] = useState(180);
   const [confirm, setConfirm] = useState(null); // 'clean-unused' | 'trim' | 'wipe'
   const [working, setWorking] = useState(false);
-  const s = storage || initial || {};
-  const unused = (s.unusedTracks || 0) + (s.unusedReads || 0);
+  const s = initial || storage || {}; // the page reloads the numbers after every change
+  const unused = s.unusedTracks || 0;
 
   const run = async () => {
     const action = confirm;
@@ -58,7 +58,7 @@ export default function AdminDataPanel({ storage: initial, onChanged }) {
   const DIALOG = {
     'clean-unused': {
       title: 'Clean up unused data?',
-      description: `Deletes ${fmtInt(s.unusedTracks || 0)} saved lists no user's search uses any more, and stops ${fmtInt(s.unusedReads || 0)} daily reads that nobody needs (they spend scraping credits every day). Nobody's searches change.`,
+      description: `Deletes ${fmtInt(unused)} saved lists no entry uses any more (left by deleted or old searches). No entry changes.`,
       label: 'Clean up',
     },
     trim: {
@@ -68,7 +68,7 @@ export default function AdminDataPanel({ storage: initial, onChanged }) {
     },
     wipe: {
       title: 'Delete ALL Product Research data?',
-      description: 'Every user’s searches, every saved product and all its history, and the daily-read list — gone. Accounts and coins are in the admin panel and are not touched. This can’t be undone.',
+      description: 'Every entry, every saved product and all its history, and every user’s unlocks — gone. Accounts and coins are in the admin panel and are not touched. This can’t be undone.',
       label: 'Delete everything',
     },
   };
@@ -83,17 +83,17 @@ export default function AdminDataPanel({ storage: initial, onChanged }) {
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        <Stat label="Users with searches" value={fmtInt(s.users || 0)} />
-        <Stat label="Saved lists" value={fmtInt(s.tracks || 0)} sub="one per market place / link + page range" />
-        <Stat label="Daily reads" value={fmtInt(s.dailyReads || 0)} sub="read again every day" />
-        <Stat label="Unused" value={fmtInt(unused)} sub={`${fmtInt(s.unusedTracks || 0)} lists · ${fmtInt(s.unusedReads || 0)} daily reads`} />
+        <Stat label="Entries" value={fmtInt(s.entries || 0)} sub={`${fmtInt(s.autoDaily || 0)} read every day`} />
+        <Stat label="Users who unlocked" value={fmtInt(s.users || 0)} />
+        <Stat label="Saved lists" value={fmtInt(s.tracks || 0)} sub="products + daily history" />
+        <Stat label="Unused" value={fmtInt(unused)} sub="saved lists no entry uses" />
         <Stat label="Storage used" value={size(s.bytes || 0)} />
       </div>
 
       <div className="grid gap-3 lg:grid-cols-3">
         <div className="flex flex-col gap-2 rounded-xl border border-divider bg-background p-3">
           <p className="flex items-center gap-1.5 text-sm font-semibold text-foreground"><Eraser size={15} /> Clean up unused data</p>
-          <p className="text-xs text-muted">Data nobody’s search uses any more, and daily reads for nobody — saves storage and scraping credits. Nobody loses anything they track.</p>
+          <p className="text-xs text-muted">Saved data no entry uses any more — saves storage. No entry loses anything.</p>
           <button type="button" disabled={!unused} onClick={() => setConfirm('clean-unused')} className="mt-auto inline-flex w-fit items-center gap-1.5 rounded-full bg-action px-3 py-1.5 text-sm font-semibold text-white hover:bg-action-hover disabled:opacity-40">
             <Database size={14} /> {unused ? `Clean up ${fmtInt(unused)}` : 'Nothing unused'}
           </button>
@@ -101,7 +101,7 @@ export default function AdminDataPanel({ storage: initial, onChanged }) {
 
         <div className="flex flex-col gap-2 rounded-xl border border-divider bg-background p-3">
           <p className="flex items-center gap-1.5 text-sm font-semibold text-foreground"><History size={15} /> Delete old history</p>
-          <p className="text-xs text-muted">Daily snapshots older than the age you pick, for every user. Searches stay; their older days go.</p>
+          <p className="text-xs text-muted">Daily snapshots older than the age you pick, in every entry. Entries stay; their older days go.</p>
           <div className="mt-auto flex flex-wrap items-center gap-2">
             <label className="inline-flex items-center gap-1.5 text-xs text-muted">
               Older than
@@ -117,7 +117,7 @@ export default function AdminDataPanel({ storage: initial, onChanged }) {
 
         <div className="flex flex-col gap-2 rounded-xl border border-neg/30 bg-neg/5 p-3">
           <p className="flex items-center gap-1.5 text-sm font-semibold text-neg"><Trash2 size={15} /> Delete everything</p>
-          <p className="text-xs text-muted">All Product Research data for every user — a fresh start. Accounts and coins are not touched. You’ll type DELETE to confirm.</p>
+          <p className="text-xs text-muted">Every entry and all its data, and every user’s unlocks — a fresh start. Accounts and coins are not touched. You’ll type DELETE to confirm.</p>
           <button type="button" onClick={() => setConfirm('wipe')} className="mt-auto inline-flex w-fit items-center gap-1.5 rounded-full bg-neg px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90">
             <Trash2 size={14} /> Delete all data
           </button>

@@ -17,6 +17,16 @@ npm run dev            # http://localhost:3006/product-research
 npm test               # metrics + per-marketplace parser tests
 ```
 
+## Pages
+
+| Page | Who | What's on it |
+|---|---|---|
+| `/product-research` (home) | every signed-in user | Entries ▾, Date, Excel, PDF + the **Daily History** table. An entry not unlocked yet shows its Unlock card (first unlock free, then 10 coins once). |
+| `/product-research/new-search` | **master admin only** (checked by the server; nothing is drawn until it says yes) | Add an entry: **1** market place → **2** category (name = `marketplace_category`, unique) → **3** the one link to read (empty = the market place's search) → **4** pages + Daily on/off → Add & search. **All entries** table: tick several → Search now / Delete; a **Daily** switch on every row (off = never read automatically). Click a name for its **Products** (cards, line chart, table, Details). Storage tools. |
+
+Old addresses `/product-research/settings` and `/products` redirect to New Search.
+The navbar has one link, Product Research; New Search is in the master admin's account menu.
+
 ## How it works
 
 | Piece | Where |
@@ -29,7 +39,7 @@ npm test               # metrics + per-marketplace parser tests
 | Storage: shared tracks + daily history, user search lists, cron index | `lib/research/store.js` (Vercel Blob, or `./.data/` locally) |
 | Rank moves, review growth, status, chart series, KPIs (pure) | `lib/research/metrics.js` |
 | API | `app/api/research/*`, `app/api/cron/refresh` |
-| Page | `app/product-research/page.js` → `components/research/*` |
+| Pages | `app/product-research/{page,products/page,settings/page}.js` → `components/research/*` |
 
 **Pages.** Each search reads a range of result pages, From page … To page
 (up to page 20, at most 10 pages per search). Rank is the product's place in
@@ -43,11 +53,10 @@ stored per product (`rank, page, price, MRP, rating, reviews, ad`). Vercel
 Cron calls `/api/cron/refresh` daily (`vercel.json`); opening a search that
 hasn't been read today also refreshes it (free).
 
-**Billing** (`data/billing.js`). A signed-in user's first search is free;
-each later *new* search = 1 × `pr-search` (10 coins in the Tools Catalog),
-charged only **after** the scrape found products — an empty or blocked search
-costs nothing. Reopening, refreshing, graphs, Details, downloads and Import
-Sheet are free. In the admin panel run `npm run db:sync-product-research` once
+**Billing** (`data/billing.js`). Only the master admin adds and reads
+entries (never charged). Every user sees every entry; to see one's data they
+unlock it once, for good: the first unlock is free, each other one is 1 ×
+`pr-search` (10 coins in the Tools Catalog), never charged twice. In the admin panel run `npm run db:sync-product-research` once
 to add the tool + feature to the catalog and grant it to users.
 
 **Import Sheet.** An Excel/CSV with `Link | Date | Price | Review | Rating |
