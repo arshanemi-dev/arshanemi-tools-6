@@ -11,7 +11,7 @@ test('a page is counted against the pages before it: listed, new, ads', () => {
   // page 2 repeats b and c — only d and e are new; the same id twice on one page counts once
   assert.deepEqual(countPage(ps(['b', 'c', 'd', 'e', 'e']), seen), { shown: 5, added: 2, ads: 0 });
   assert.deepEqual(countPage(ps(['a', 'd']), seen), { shown: 2, added: 0, ads: 0 }); // nothing new: results ended
-  assert.equal(seen.size, 5);
+  assert.equal(seen.size, 6); // a, b, ad1, c, d, e
 });
 
 const entry = (pageCounts, extra = {}) => ({ kind: 'search', pageCounts, countedRange: { fromPage: 1, toPage: 3 }, endedAt: null, failedAt: null, ...extra });

@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { mergeProducts, referenceDay } from '@/lib/research/metrics';
 import { marketplaceName } from '@/data/marketplaces';
+import { pickLabel } from '@/lib/research/myEntries';
 
 // The filters both data pages share (Daily History, Products) and what they
 // narrow: the open search's products → by market place → the reference day
@@ -25,6 +26,7 @@ export function useResearchView(r) {
     dateRange, setDateRange, from, to,
     allProducts, products, refDay,
     totalProducts: allProducts.length,
-    activeLabel: r.searches.find((s) => s.id === r.activeId)?.query,
+    // What's opening: the ticked entries' names (one entry on the admin's page).
+    activeLabel: pickLabel((r.picked || (r.activeId ? [r.activeId] : [])).map((id) => r.searches.find((s) => s.id === id)?.query).filter(Boolean)),
   };
 }

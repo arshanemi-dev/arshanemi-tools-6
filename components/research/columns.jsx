@@ -92,8 +92,12 @@ export function productColumns({ onDetails }) {
 // The Daily History view — the sheet layout: Link, Date, Price, Review,
 // Rating, Ranking, then rank moves vs that day's 1 Week / 15 Days / 1 Month /
 // 3 Months / All Time.
-export function dailyColumns({ showProduct = true } = {}) {
+// `showEntry` = several entries are shown together: an Entry column first.
+export function dailyColumns({ showProduct = true, showEntry = false } = {}) {
   return [
+    ...(showEntry ? [
+      { key: 'entry', label: 'Entry', value: (r) => r.entry, text: (r) => r.entry || '-', tone: () => 'font-semibold text-foreground' },
+    ] : []),
     ...(showProduct ? [
       { key: 'title', label: 'Link', value: (r) => r.title, text: (r) => r.title, wrap: true,
         render: (r) => <a href={r.link} target="_blank" rel="noopener noreferrer" title={r.link} className="line-clamp-2 max-w-[20rem] whitespace-normal text-left text-link hover:underline">{r.title}</a> },

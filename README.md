@@ -21,11 +21,13 @@ npm test               # metrics + per-marketplace parser tests
 
 | Page | Who | What's on it |
 |---|---|---|
-| `/product-research` (home) | every signed-in user | Entries ▾, Date, Excel, PDF + the **Daily History** table. An entry not unlocked yet shows its Unlock card (first unlock free, then 10 coins once). |
+| `/product-research` (home) | every signed-in user | **Entries ▾** — pick several (up to 10): only the user's saved entries (every entry when they saved none); the ticked ones show together in the **Daily History** table, with an Entry column when there are several. Date, Excel, PDF. A ticked entry not unlocked yet shows its Unlock card (first unlock free, then 10 coins once) — or, next to others that are unlocked, a small Unlock button above the table. |
+| `/product-research/my-entries` (My Entries) | every signed-in user, their own list | Every entry in a table (market place, category, pages, unlocked or locked, saved or not) with **Add / Remove** on each row, or tick several → Add ticked / Remove ticked. Saved ones show as chips on top (× removes). Saved per user in `research/users/<id>` (`myEntries`, next to `unlocked`). Saving is free and doesn't unlock. |
 | `/product-research/new-search` | **master admin only** (checked by the server; nothing is drawn until it says yes) | Add an entry: **1** market place → **2** category (name = `marketplace_category`, unique) → **3** the one link to read (empty = the market place's search) → **4** pages + Daily on/off → Add & search. **All entries** table: tick several → Search now / Delete; a **Daily** switch on every row (off = never read automatically). Click a name for its **Products** (cards, line chart, table, Details). Storage tools. |
 
 Old addresses `/product-research/settings` and `/products` redirect to New Search.
-The navbar has one link, Product Research; New Search is in the master admin's account menu.
+The navbar has Product Research and (signed in) My Entries; New Search is in the master admin's account menu.
+With the header hidden (embedded), My Entries is reached from Entries ▾ › Manage my entries.
 
 ## How it works
 
@@ -46,6 +48,15 @@ The navbar has one link, Product Research; New Search is in the master admin's a
 the whole listing: when the range starts after page 1, the pages before it
 are counted as full pages (Flipkart, 40 a page: page 3 starts at rank 81),
 and the page says so.
+
+**Products / Page.** Every Search records what each page gave (listed, new,
+ads). The New Search table shows it on every row, filled in by the Search
+itself: `p1 48 · p2 52 · p3 57 = 157` (the new products each page added, then
+the total). `ended` = the results ran out there, `–` = not read, red ✕ = the
+page couldn't be read, amber ⚠ = a page that listed under half of the fullest
+page while a later page still had more (it probably didn't load fully).
+**Tick N with a bad page** ticks just those entries, so Search reads again
+only what needs it. Rules: `lib/research/pageCounts.js`.
 
 **Tracking.** A track = marketplace + keyword + page range, shared by every
 user who searches it (one scrape a day serves all). Each day's snapshot is

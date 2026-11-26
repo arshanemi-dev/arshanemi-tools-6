@@ -6,14 +6,16 @@ import { useStoredUser } from '@/lib/useStoredUser';
 import DashboardTopbar from '@/components/dashboard/DashboardTopbar';
 import DailyHistoryPage from './DailyHistoryPage';
 import NewSearchPage from './NewSearchPage';
+import MyEntriesPage from './MyEntriesPage';
 
-const PAGES = { daily: DailyHistoryPage, 'new-search': NewSearchPage };
+const PAGES = { daily: DailyHistoryPage, 'new-search': NewSearchPage, 'my-entries': MyEntriesPage };
 
 const HEADER_HIDDEN = process.env.NEXT_PUBLIC_IS_Header_Hide === 'true';
 
 // Client shell (tools-5's ProfitLossShell): the topbar session, then the
-// page — `page` = 'daily' (home, Daily History) | 'new-search' (the master
-// admin's; it checks the role with the server before showing anything).
+// page — `page` = 'daily' (home, Daily History) | 'my-entries' (My Entries
+// — any signed-in user's own list) | 'new-search' (the master admin's; it
+// checks the role with the server before showing anything).
 export default function ResearchShell({ page = 'daily' }) {
   const Page = PAGES[page] || DailyHistoryPage;
   const storedUser = useStoredUser(); // undefined until hydrated

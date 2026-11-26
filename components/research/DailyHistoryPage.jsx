@@ -25,7 +25,9 @@ export default function DailyHistoryPage({ signedIn }) {
   const r = useResearch({ signedIn, addToast });
   const v = useResearchView(r);
   const [tableView, setTableView] = useState([]);
-  const columns = useMemo(() => dailyColumns(), []);
+  // Several entries ticked together → an Entry column says which row is whose.
+  const many = (r.data?.search?.entries?.length || 0) > 1;
+  const columns = useMemo(() => dailyColumns({ showEntry: many }), [many]);
   const rows = useMemo(() => dailyRows(v.products, v.from, v.to), [v.products, v.from, v.to]);
 
   const doExport = async (kind) => {

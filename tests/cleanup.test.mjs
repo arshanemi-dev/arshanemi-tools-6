@@ -89,6 +89,21 @@ test('the daily switch is kept, and stats show what an entry holds', async () =>
   assert.equal(withStats.lastRead, '2026-11-24');
 });
 
+test('stats carry the LATEST read’s page counts — even when that read failed on page 1', async () => {
+  const meta = { id: 'pc-track', platform: 'amazon', query: 'bottle', fromPage: 1, toPage: 2 };
+  const fake = { id: 'pc', kind: 'search', trackId: 'pc-track' };
+  await store.saveRun(meta, { ...run(product('P1', 1)), pageCounts: [{ page: 1, shown: 48, added: 48, ads: 2 }, { page: 2, shown: 48, added: 40, ads: 0 }] }, '2026-11-25');
+  let [s] = await cleanup.entryStats([fake]);
+  assert.deepEqual(s.pageCounts.map((c) => c.added), [48, 40]);
+  assert.deepEqual(s.countedRange, { fromPage: 1, toPage: 2 });
+  // The next read is blocked on page 1: no counts — that is what shows now.
+  await store.saveRun(meta, { products: [], pagesRead: 0, pageCounts: [], failedAt: 1, error: 'Page 1: blocked' }, '2026-11-26');
+  [s] = await cleanup.entryStats([fake]);
+  assert.deepEqual(s.pageCounts, []);
+  assert.equal(s.failedAt, 1);
+  assert.equal(s.countedError, 'Page 1: blocked');
+});
+
 test('clean up: saved data no entry uses goes, and the old search lists (unlocks kept)', async () => {
   await store.saveRun({ id: 'orphan', platform: 'amazon', query: 'x', fromPage: 1, toPage: 1 }, run(product('O', 1)), '2026-11-24');
   await entries.addUnlocked('u1', 'some-entry');
