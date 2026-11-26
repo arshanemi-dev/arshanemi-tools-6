@@ -12,25 +12,25 @@ import PlatformBadge from './PlatformBadge';
 export const MY_ENTRIES_HREF = '/product-research/my-entries';
 
 // "Entries ▾" — pick several. It lists ONLY the entries this user saved on
-// My Entries: name, market place, pages, a lock on the ones not unlocked
-// yet. Nothing is ticked at first. Search by name, market place or
+// My Entries: name, market place, pages, "Expired" on the ones whose month
+// ran out (ticking one shows its Renew card). Nothing is ticked at first. Search by name, market place or
 // category; tick up to MAX_PICK; Show opens them together in Daily History
 // (Show with none ticked clears it).
 // `searches` = the listed entries, `picked` = the ticked ids, `onPick(ids)`.
 export default function SearchPicker({ searches = [], picked = [], onPick }) {
   const chosen = searches.filter((s) => picked.includes(s.id));
   const lockedCount = chosen.filter((s) => s.locked).length;
-  const text = !chosen.length ? `Pick entries (${searches.length})` : chosen.length === 1 ? chosen[0].name : `${chosen.length} entries`;
+  const text = !chosen.length ? `Pick categories (${searches.length})` : chosen.length === 1 ? chosen[0].name : `${chosen.length} categories`;
 
   return (
     <Popover
       align="left"
       panelClass="p-1"
       trigger={() => (
-        <button type="button" disabled={!searches.length} title="Pick one or several entries to see together" className={`inline-flex h-9 items-center gap-1.5 rounded-full border bg-background px-3 text-sm font-medium text-foreground hover:border-divider disabled:opacity-45 ${chosen.length > 1 ? 'border-accent' : 'border-divider-light'}`}>
+        <button type="button" disabled={!searches.length} title="Pick one or several categories to see together" className={`inline-flex h-9 items-center gap-1.5 rounded-full border bg-background px-3 text-sm font-medium text-foreground hover:border-divider disabled:opacity-45 ${chosen.length > 1 ? 'border-accent' : 'border-divider-light'}`}>
           <Layers size={15} className="text-muted" />
           <span className="max-w-[14rem] truncate">{text}</span>
-          {lockedCount > 0 && <Lock size={12} className="text-subtle" aria-label={`${lockedCount} locked`} />}
+          {lockedCount > 0 && <Lock size={12} className="text-subtle" aria-label={`${lockedCount} expired`} />}
           <ChevronDown size={13} className="text-muted" />
         </button>
       )}
@@ -77,7 +77,7 @@ function PickList({ searches, picked, onPick, close }) {
                     <span className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
                       {s.kind === 'import' && <FileSpreadsheet size={13} className="shrink-0 text-muted" />}
                       <span className="truncate">{s.name}</span>
-                      {s.locked && <Lock size={12} className="shrink-0 text-subtle" aria-label="locked" />}
+                      {s.locked && <span className="inline-flex shrink-0 items-center gap-0.5 text-[10px] font-semibold text-[color:var(--move-down)]"><Lock size={10} /> {s.status === 'expired' ? 'Expired' : 'Not paid'}</span>}
                     </span>
                     <span className="mt-0.5 flex items-center gap-1.5 text-[11px] text-subtle">
                       {s.platform && s.platform !== 'mixed' && <PlatformBadge platform={s.platform} />}
@@ -93,7 +93,7 @@ function PickList({ searches, picked, onPick, close }) {
       {full && <p className="px-1 text-[11px] text-subtle">At most {MAX_PICK} entries at once.</p>}
       <div className="flex items-center gap-2">
         <Link href={MY_ENTRIES_HREF} className="text-[12px] font-semibold text-link hover:underline" title="Add or remove entries in this list">
-          Manage my entries
+          Manage my categories
         </Link>
         <span className="ml-auto text-[11px] text-subtle">{ticked.length} selected</span>
         <button type="button" onClick={close} className="rounded-lg border border-divider-light px-2.5 py-1 text-[12px] font-medium text-muted hover:bg-card-hover">Cancel</button>

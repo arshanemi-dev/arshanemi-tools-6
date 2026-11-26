@@ -2,7 +2,7 @@ import { ToastProvider } from '@/components/admin/Toast';
 import ResearchShell from '@/components/research/ResearchShell';
 
 export const metadata = {
-  title: 'My Entries',
+  title: 'Product Categories',
 };
 
 // Every signed-in user's own entry list: all entries in a table with

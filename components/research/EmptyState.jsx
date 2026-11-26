@@ -3,7 +3,7 @@
 import { AlertTriangle, BarChart3, CalendarClock, Coins, Layers, LogIn, Search, Trophy } from 'lucide-react';
 import Link from 'next/link';
 import { redirectToLogin } from '@/lib/authGate';
-import { fmtDay } from '@/lib/research/format';
+import { fmtDay, fmtInt } from '@/lib/research/format';
 import PlatformBadge from './PlatformBadge';
 
 // What the home page shows before there's an entry to show: what the tool
@@ -17,14 +17,14 @@ const STEPS = [
 ];
 
 export default function EmptyState({ signedIn, isAdmin = false, cost }) {
-  const price = cost?.coinsPerSearch;
+  const price = cost?.coinsPerMonth;
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-5 py-6">
       <div className="text-center">
         <h1 className="text-2xl font-bold tracking-tight text-foreground">Find the best-selling products in any category</h1>
         <p className="mt-1 text-sm text-muted">
           {!signedIn
-            ? 'Sign in to see the categories tracked every day.'
+            ? 'Log in to use Product Research — an account is needed.'
             : isAdmin
               ? 'No entries yet — add the first one on the New Search page.'
               : 'No categories are tracked yet — check back soon.'}
@@ -47,7 +47,7 @@ export default function EmptyState({ signedIn, isAdmin = false, cost }) {
       {!isAdmin && (
         <div className="flex flex-wrap items-center justify-center gap-3 rounded-2xl border border-divider bg-background px-4 py-3 text-sm text-muted">
           <Coins size={16} className="text-accent" />
-          <span>Your <strong className="text-foreground">first entry is free</strong>{price ? <> · each other entry is <strong className="text-foreground">{price} coins</strong> to unlock, once — it stays yours</> : ' · each other entry costs coins to unlock, once'} · filters and downloads are always free.</span>
+          <span>Each entry is paid <strong className="text-foreground">a month at a time</strong>{price ? <> — <strong className="text-foreground">{fmtInt(price)} coins</strong> per entry / month</> : ' in coins'}, renewing by itself from your wallet · filters and downloads are included.</span>
           {!signedIn && (
             <button type="button" onClick={redirectToLogin} className="inline-flex items-center gap-1.5 rounded-full bg-accent px-4 py-1.5 text-sm font-semibold text-white hover:bg-accent-hover">
               <LogIn size={14} /> Log in

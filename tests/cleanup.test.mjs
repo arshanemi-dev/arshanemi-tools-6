@@ -58,12 +58,15 @@ test('a new entry: name = marketplace_category, unique; the link must be that ma
   assert.match(linked.error, /already reads this same link/); // myntra_kurtas reads that link
 });
 
-test('unlocks are kept per user', async () => {
-  assert.deepEqual(await entries.readUnlocked('u9'), []);
-  await entries.addUnlocked('u9', 'e1');
-  await entries.addUnlocked('u9', 'e1');
-  await entries.addUnlocked('u9', 'e2');
-  assert.deepEqual(await entries.readUnlocked('u9'), ['e1', 'e2']);
+test('each user has their own file: saved entries + their plans', async () => {
+  assert.deepEqual(await entries.readUserDoc('u9'), { myEntries: [], plans: {} });
+  const out = await entries.updateUserDoc('u9', async (doc) => ({ doc: { ...doc, myEntries: ['e1'], plans: { e1: { paidUntil: '2030-01-01T00:00:00.000Z', autoRenew: true } } }, result: 'saved' }));
+  assert.equal(out, 'saved');
+  assert.deepEqual((await entries.readUserDoc('u9')).myEntries, ['e1']);
+  // A change that returns no doc writes nothing.
+  await entries.updateUserDoc('u9', async () => ({ doc: null, result: null }));
+  assert.deepEqual((await entries.readUserDoc('u9')).myEntries, ['e1']);
+  assert.deepEqual((await entries.readUserDoc('u8')).myEntries, []);
 });
 
 test('deleting an entry deletes its saved data — unless another entry reads the same page', async () => {
@@ -104,15 +107,17 @@ test('stats carry the LATEST read’s page counts — even when that read failed
   assert.equal(s.countedError, 'Page 1: blocked');
 });
 
-test('clean up: saved data no entry uses goes, and the old search lists (unlocks kept)', async () => {
+test('clean up: saved data no entry uses goes, and the old search lists (saved entries + plans kept)', async () => {
   await store.saveRun({ id: 'orphan', platform: 'amazon', query: 'x', fromPage: 1, toPage: 1 }, run(product('O', 1)), '2026-11-24');
-  await entries.addUnlocked('u1', 'some-entry');
+  const plan = { paidUntil: '2030-01-01T00:00:00.000Z', autoRenew: true };
+  await entries.updateUserDoc('u1', async (doc) => ({ doc: { ...doc, myEntries: ['some-entry'], plans: { 'some-entry': plan } }, result: null }));
   const before = await cleanup.storageSummary();
   assert.ok(before.unusedTracks >= 1);
+  assert.ok(before.users >= 1); // users with entries
   const r = await cleanup.cleanUnused();
   assert.ok(r.deletedTracks >= 1);
   assert.equal(await exists('orphan'), false);
-  assert.deepEqual(await readBlobJson('research/users/u1', null), { userId: 'u1', unlocked: ['some-entry'] });
+  assert.deepEqual(await readBlobJson('research/users/u1', null), { userId: 'u1', myEntries: ['some-entry'], plans: { 'some-entry': plan } });
   assert.equal(await readBlobJson('research/users/u2', null), null);
   assert.equal((await cleanup.storageSummary()).unusedTracks, 0);
 });

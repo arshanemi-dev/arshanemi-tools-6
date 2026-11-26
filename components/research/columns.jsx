@@ -93,7 +93,10 @@ export function productColumns({ onDetails }) {
 // Rating, Ranking, then rank moves vs that day's 1 Week / 15 Days / 1 Month /
 // 3 Months / All Time.
 // `showEntry` = several entries are shown together: an Entry column first.
-export function dailyColumns({ showProduct = true, showEntry = false } = {}) {
+// `onDetails(productKey)` = a Details button per row (the product's history
+// window — ProductHistoryModal); it isn't part of a download.
+// `showPage` = false leaves out the Page column (the Product Details window).
+export function dailyColumns({ showProduct = true, showEntry = false, showPage = true, onDetails = null } = {}) {
   return [
     ...(showEntry ? [
       { key: 'entry', label: 'Entry', value: (r) => r.entry, text: (r) => r.entry || '-', tone: () => 'font-semibold text-foreground' },
@@ -101,6 +104,15 @@ export function dailyColumns({ showProduct = true, showEntry = false } = {}) {
     ...(showProduct ? [
       { key: 'title', label: 'Link', value: (r) => r.title, text: (r) => r.title, wrap: true,
         render: (r) => <a href={r.link} target="_blank" rel="noopener noreferrer" title={r.link} className="line-clamp-2 max-w-[20rem] whitespace-normal text-left text-link hover:underline">{r.title}</a> },
+      ...(onDetails ? [{
+        key: 'details', label: 'Details', noExport: true, value: () => '', text: () => '',
+        description: 'This product day by day, week by week or month by month — averages, totals, a chart and its trend.',
+        render: (r) => (
+          <button type="button" onClick={() => onDetails(r.productKey)} title="Open this product’s history" className="inline-flex h-7 items-center gap-1 rounded-full border border-divider-light px-2.5 text-xs font-semibold text-link hover:bg-card-hover">
+            <BarChart3 size={12} /> Details
+          </button>
+        ),
+      }] : []),
       { key: 'platform', label: 'Market Place', value: (r) => r.platform, text: (r) => r.platform, render: (r) => <PlatformBadge platform={r.platform} /> },
     ] : []),
     { key: 'date', label: 'Date', value: (r) => r.date, text: (r) => fmtDay(r.date) },
@@ -109,7 +121,9 @@ export function dailyColumns({ showProduct = true, showEntry = false } = {}) {
     { key: 'bought', label: 'Bought / Month', numeric: true, value: (r) => r.bought, text: (r) => fmtBought(r.bought), tone: (r) => (r.bought != null ? 'text-foreground' : 'text-muted') },
     { key: 'rating', label: 'Rating', numeric: true, value: (r) => r.rating, text: (r) => fmtRating(r.rating), total: 'avg', totalFormat: avgRating },
     { key: 'rank', label: 'Ranking', numeric: true, value: (r) => r.rank, text: (r) => (r.sponsored ? 'Ad' : fmtRank(r.rank)), tone: () => 'font-semibold text-foreground' },
-    { key: 'page', label: 'Page', numeric: true, value: (r) => r.page, text: (r) => (r.page == null ? '-' : String(r.page)), tone: () => 'text-muted' },
+    ...(showPage ? [
+      { key: 'page', label: 'Page', numeric: true, value: (r) => r.page, text: (r) => (r.page == null ? '-' : String(r.page)), tone: () => 'text-muted' },
+    ] : []),
     ...WINDOWS.map((w) => ({
       key: w.id, label: w.label, numeric: true, value: (r) => r.moves[w.id], text: (r) => fmtMove(r.moves[w.id]), tone: (r) => moveTone(r.moves[w.id]),
     })),

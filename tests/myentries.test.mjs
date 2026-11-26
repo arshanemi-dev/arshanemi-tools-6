@@ -65,33 +65,13 @@ test('several entries together: the same product keeps one history per entry, ro
   assert.equal(combineEntries([], 'x'), null);
 });
 
-test('saving per user: only existing entries can be added; each user has their own list', async () => {
-  let r = await entries.changeMyEntries('u1', { add: ['a', 'b', 'nope'] }, ['a', 'b', 'c']);
-  assert.deepEqual(r.myEntries, ['a', 'b']);
-  assert.equal(r.added, 2);
-  assert.deepEqual(r.unknown, ['nope']);
-  r = await entries.changeMyEntries('u1', { add: ['b'] }, ['a', 'b', 'c']); // already there
-  assert.equal(r.added, 0);
-  r = await entries.changeMyEntries('u1', { remove: ['a'], add: ['c'] }, ['a', 'b', 'c']);
-  assert.deepEqual(r.myEntries, ['b', 'c']);
-  assert.equal(r.removed, 1);
-  // An entry deleted since is dropped on the next change.
-  r = await entries.changeMyEntries('u1', { add: ['a'] }, ['a', 'c']);
-  assert.deepEqual(r.myEntries, ['c', 'a']);
-  assert.deepEqual((await entries.readUserLists('u1')).myEntries, ['c', 'a']);
-  assert.deepEqual((await entries.readUserLists('u2')).myEntries, []);
-});
+// Adding, removing and paying: tests/billing.test.mjs.
 
-test('saved entries and unlocks live side by side in the user file', async () => {
-  await entries.addUnlocked('u1', 'a');
-  assert.deepEqual(await entries.readUserLists('u1'), { unlocked: ['a'], myEntries: ['c', 'a'] });
-  await entries.changeMyEntries('u1', { remove: ['c'] }, ['a', 'c']);
-  assert.deepEqual(await entries.readUnlocked('u1'), ['a']); // unlocks untouched
-});
-
-test('Clean up keeps a user’s saved entries (even with no unlocks)', async () => {
+test('Clean up keeps a user’s saved entries and plans — only the old search list goes', async () => {
   await writeBlobJson('research/entries', []);
-  await writeBlobJson('research/users/u3', { userId: 'u3', searches: [{ id: 'old' }], myEntries: ['c'] });
+  const plans = { c: { paidUntil: '2030-01-01T00:00:00.000Z', autoRenew: true } };
+  await writeBlobJson('research/users/u3', { userId: 'u3', searches: [{ id: 'old' }], myEntries: ['c'], plans });
   await cleanup.cleanUnused();
-  assert.deepEqual(await readBlobJson('research/users/u3', null), { userId: 'u3', unlocked: [], myEntries: ['c'] });
+  assert.deepEqual(await readBlobJson('research/users/u3', null), { userId: 'u3', myEntries: ['c'], plans });
+  assert.deepEqual((await entries.readUserDoc('u3')).myEntries, ['c']);
 });

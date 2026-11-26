@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server'
-import { PR_BILLING } from '@/data/billing'
 import { adminOnly, canSee, isAdmin, signedIn } from '@/lib/research/access'
-import { editEntry, entryAsSearch, readEntries, readUnlocked, updateEntries } from '@/lib/research/entries'
+import { editEntry, entryAsSearch, readEntries, readUserDoc, updateEntries } from '@/lib/research/entries'
 import { addCategory } from '@/lib/research/config'
 import { readListingUrl } from '@/data/marketplaces'
 import { deleteEntries } from '@/lib/research/cleanup'
 import { searchPayload } from '@/lib/research/service'
+import { planStatus } from '@/lib/research/plans'
+import { coinsPerMonth } from '@/lib/research/price'
 
 export const runtime = 'nodejs'
 
@@ -15,21 +16,22 @@ async function findEntry(params) {
 }
 
 // GET → { search (the entry), tracks, status } — its products and daily
-// history. Only once this user has unlocked it (the master admin always);
-// otherwise 402 { locked: true, entry, coinsPerUnlock, freeLeft }.
+// history. Only while this user's month for it is paid (the master admin
+// always); otherwise 402 { locked: true, entry, planStatus ('expired' |
+// 'none'), paidUntil, coinsPerMonth } — the page offers Renew / Add.
 export async function GET(req, { params }) {
   const { payload, res } = await signedIn(req)
   if (res) return res
   const entry = await findEntry(params)
   if (!entry) return NextResponse.json({ error: 'Entry not found' }, { status: 404 })
-  const unlocked = isAdmin(payload) ? [] : await readUnlocked(payload.userId)
-  if (!canSee(payload, entry, unlocked)) {
-    const paid = process.env.NEXT_PUBLIC_IS_PAID === 'true'
+  const plans = isAdmin(payload) ? {} : (await readUserDoc(payload.userId)).plans
+  if (!canSee(payload, entry, plans)) {
     return NextResponse.json({
       locked: true,
       entry: { id: entry.id, name: entry.name, platform: entry.platform, category: entry.category },
-      coinsPerUnlock: paid ? PR_BILLING.displayCoins : 0,
-      freeLeft: paid ? Math.max(0, PR_BILLING.freeUnlocks - unlocked.length) : Infinity,
+      planStatus: planStatus(plans[entry.id]),
+      paidUntil: plans[entry.id]?.paidUntil || null,
+      coinsPerMonth: await coinsPerMonth(req),
     }, { status: 402 })
   }
   const shown = isAdmin(payload) ? entry : { ...entry, url: undefined, autoDaily: undefined }

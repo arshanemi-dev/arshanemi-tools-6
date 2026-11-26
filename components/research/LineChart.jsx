@@ -44,8 +44,8 @@ function readColors() {
 }
 
 // The theme's colours, kept up to date when the theme switches (ThemeContext
-// sets data-theme / CSS variables on <html>).
-function useThemeColors() {
+// sets data-theme / CSS variables on <html>). Shared with HistoryTrendChart.
+export function useThemeColors() {
   const [colors, setColors] = useState(null);
   useEffect(() => {
     const update = () => setColors(readColors());
@@ -58,7 +58,7 @@ function useThemeColors() {
 }
 
 // Hover guide line: a dashed line down the hovered day.
-const hoverLine = {
+export const hoverLine = {
   id: 'hoverLine',
   afterDatasetsDraw(chart) {
     const active = chart.tooltip?.getActiveElements?.() || [];

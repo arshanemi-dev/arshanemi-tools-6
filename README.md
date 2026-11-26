@@ -21,8 +21,8 @@ npm test               # metrics + per-marketplace parser tests
 
 | Page | Who | What's on it |
 |---|---|---|
-| `/product-research` (home) | every signed-in user | **Entries ▾** — pick several (up to 10): ONLY the user's saved entries, nothing ticked when the page opens; the ticked ones show together in the **Daily History** table, with an Entry column when there are several. **Add Entries** (to My Entries). Date, Excel, PDF. A ticked entry not unlocked yet shows its Unlock card (first unlock free, then 10 coins once) — or, next to others that are unlocked, a small Unlock button above the table. |
-| `/product-research/my-entries` (My Entries) | every signed-in user, their own list | Every entry in a table (market place, category, pages, unlocked or locked, saved or not) with **Add / Remove** on each row, or tick several → Add ticked / Remove ticked. Saved ones show as chips on top (× removes). Saved per user in `research/users/<id>` (`myEntries`, next to `unlocked`). Saving is free and doesn't unlock. |
+| `/product-research` (home) | every signed-in user | **Entries ▾** — pick several (up to 10): ONLY the user's saved entries, nothing ticked when the page opens; the ticked ones show together in the **Daily History** table, with an Entry column when there are several. Each row's **Details** opens that product's history window: **3 Days / 1 Week / 15 Days** (a column per day — the latest + the days before), **1 Month** (Week 1 … Week 5), **All Time** (a column per month); rows Rank, Price, Reviews, Reviews gained, Rating, Bought, Days tracked with **Average** and **Total**; a chart of any of them with its straight trend line, Growth (first → last) and Trend angle (`lib/research/history.js`). **Add Entries** (to My Entries). Date, Excel, PDF. A ticked entry that's Expired shows its Renew card — or, next to others that are paid, a small Renew button above the table. |
+| `/product-research/my-entries` (My Entries) | every signed-in user, their own list | Every entry in a table (market place, category, pages, plan — paid till / Expired —, on my list or not) with **Add · 5,000/mo**, **Renew** or **Remove** on each row, or tick several → Add / Renew / Remove ticked. The list shows as chips on top. See **Billing** below. |
 | `/product-research/new-search` | **master admin only** (checked by the server; nothing is drawn until it says yes) | Add an entry: **1** market place → **2** category (name = `marketplace_category`, unique) → **3** the one link to read (empty = the market place's search) → **4** pages + Daily on/off → Add & search. **All entries** table: tick several → Search now / Delete; a **Daily** switch on every row (off = never read automatically). Click a name for its **Products** (cards, line chart, table, Details). Storage tools. |
 
 Old addresses `/product-research/settings` and `/products` redirect to New Search.
@@ -64,11 +64,27 @@ stored per product (`rank, page, price, MRP, rating, reviews, ad`). Vercel
 Cron calls `/api/cron/refresh` daily (`vercel.json`); opening a search that
 hasn't been read today also refreshes it (free).
 
-**Billing** (`data/billing.js`). Only the master admin adds and reads
-entries (never charged). Every user sees every entry; to see one's data they
-unlock it once, for good: the first unlock is free, each other one is 1 ×
-`pr-search` (10 coins in the Tools Catalog), never charged twice. In the admin panel run `npm run db:sync-product-research` once
-to add the tool + feature to the catalog and grant it to users.
+**Billing** (`data/billing.js`). Login is required and nothing is free —
+only the master admin (who adds and reads entries) is never charged. Each
+entry a user adds on My Entries is paid **a month at a time**: 1 ×
+`pr-entry-month` (5000 coins in the Tools Catalog; the windows show the live
+price) when added, then again every month while it's on their list.
+
+| What | Coins | Window |
+|---|---|---|
+| Add (on My Entries) | a month per entry not paid right now — one charge for the whole click, all or nothing | confirm → **Coins used** (paid till, wallet left) |
+| Monthly renewal | a month per entry whose month ran out — charged on the user's first visit after it ends (either page), one charge per entry | **Monthly renewal — coins used** |
+| Too few coins | nothing is added; a renewal that can't be paid turns the entry **Expired** (never into debt) | the hub's **Not Enough Coins → Add Now** |
+| Renew (an Expired one) | a month | confirm → **Coins used** |
+| Remove | stops the renewals — the month already paid isn't refunded; adding it back inside that month is free | confirm |
+
+A charge is never made twice: Add's key = user + click + entries, a renewal's
+= user + entry + the month that ran out. Per user in `research/users/<id>`:
+`myEntries` (the list) + `plans` (`paidUntil`, `autoRenew` per entry) — rules
+in `lib/research/plans.js` (pure) and `lib/research/subscriptions.js`
+(charging). In the admin panel run `npm run db:sync-product-research` once to
+add the tool + the `pr-entry-month` feature to the catalog and grant it to
+users — until then every Add is refused (feature unavailable).
 
 **Import Sheet.** An Excel/CSV with `Link | Date | Price | Review | Rating |
 Ranking` (optional `Title`, `MRP`; header may sit under a title row) becomes a

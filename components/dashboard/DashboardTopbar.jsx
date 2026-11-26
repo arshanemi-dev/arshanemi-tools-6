@@ -6,14 +6,14 @@ import { usePathname } from 'next/navigation';
 import UserMenu from './UserMenu';
 import { redirectToLogin } from '@/lib/authGate';
 
-// The dark navbar: logo, the links — Product Research, and My Entries once
+// The dark navbar: logo, the links — Product Research, and Product Categories once
 // signed in — and login / account (the master admin's New Search page is in
 // the account menu). `user` is undefined until the browser has read the
 // stored session (useStoredUser) — an empty slot then, so neither "Log in"
 // nor the menu flashes the wrong way.
 const LINKS = [
   { href: '/product-research', label: 'Product Research' },
-  { href: '/product-research/my-entries', label: 'My Entries', signedInOnly: true },
+  { href: '/product-research/my-entries', label: 'Product Categories', signedInOnly: true },
 ];
 
 export default function DashboardTopbar({ user, onLogout }) {

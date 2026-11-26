@@ -254,7 +254,7 @@ export default function NewSearchPage({ signedIn }) {
       <ConfirmDialog
         open={!!confirm}
         title={`Delete ${confirm?.ids.length === 1 ? 'this entry' : confirm?.label}?`}
-        description={confirm ? `${confirm.ids.length === 1 ? `“${confirm.label}”` : confirm.label} and the products and daily history saved for ${confirm.ids.length === 1 ? 'it' : 'them'} are deleted, for every user. Users who unlocked ${confirm.ids.length === 1 ? 'it' : 'them'} lose access. This can’t be undone.` : ''}
+        description={confirm ? `${confirm.ids.length === 1 ? `“${confirm.label}”` : confirm.label} and the products and daily history saved for ${confirm.ids.length === 1 ? 'it' : 'them'} are deleted, for every user. Users who added ${confirm.ids.length === 1 ? 'it' : 'them'} lose it, with no refund for a month already paid. This can’t be undone.` : ''}
         confirmLabel="Delete"
         loadingLabel="Deleting…"
         loading={a.busy === 'delete'}

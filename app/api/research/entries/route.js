@@ -1,39 +1,53 @@
 import { NextResponse } from 'next/server'
-import { PR_BILLING } from '@/data/billing'
 import { readListingUrl } from '@/data/marketplaces'
 import { adminOnly, isAdmin, signedIn } from '@/lib/research/access'
-import { makeEntry, readEntries, readUserLists, updateEntries } from '@/lib/research/entries'
+import { makeEntry, readEntries, readUserDoc, updateEntries } from '@/lib/research/entries'
 import { entryStats, storageSummary } from '@/lib/research/cleanup'
 import { addCategory, readCategories, readRange } from '@/lib/research/config'
+import { dueForRenewal, planStatus } from '@/lib/research/plans'
+import { coinsPerMonth } from '@/lib/research/price'
 
 export const runtime = 'nodejs'
 
-// GET → every entry, for any signed-in user:
+// GET → every entry, for any signed-in user (login is required):
 //   { entries: [{ id, name, platform, category, kind, fromPage, toPage,
-//     locked }], isAdmin, freeLeft, coinsPerUnlock, myEntries }
-// myEntries = the ids of the entries this user saved on My Entries (still
-// existing ones) — Product Research's Entries ▾ lists only these.
-// The master admin also gets each entry's link, daily switch and stats
-// (products, days, lastRead, lastError), the storage summary, the shared
-// page range and the category list.
+//     saved, status, paidUntil, autoRenew, locked }], myEntries, due,
+//     coinsPerMonth, isAdmin }
+//   saved     on this user's My Entries list (myEntries = those ids, in order)
+//   status    'active' (its month is paid) · 'expired' · 'none' (never paid)
+//   locked    its data can't be seen now (status isn't active)
+//   due       saved entries whose month ran out and that renew themselves —
+//             the page renews them (POST /api/research/my-entries/renew)
+//   coinsPerMonth  the live price of one entry for one month (0 = free)
+// A read never charges. The master admin sees every entry unlocked, free,
+// and also gets each entry's link, daily switch and stats (products, days,
+// lastRead, lastError), the storage summary, the shared page range and the
+// category list.
 export async function GET(req) {
   const { payload, res } = await signedIn(req)
   if (res) return res
   const entries = await readEntries()
   const ids = new Set(entries.map((e) => e.id))
-  const { unlocked, myEntries: saved } = await readUserLists(payload.userId)
-  const myEntries = saved.filter((id) => ids.has(id))
+  const doc = await readUserDoc(payload.userId)
+  const myEntries = doc.myEntries.filter((id) => ids.has(id))
+  const now = Date.now()
   if (isAdmin(payload)) {
     const [withStats, storage, range, categories] = await Promise.all([entryStats(entries), storageSummary(), readRange(), readCategories()])
-    return NextResponse.json({ entries: withStats.map((e) => ({ ...e, locked: false })), isAdmin: true, freeLeft: Infinity, coinsPerUnlock: 0, storage, range, categories, myEntries })
+    return NextResponse.json({
+      entries: withStats.map((e) => ({ ...e, saved: myEntries.includes(e.id), status: 'active', paidUntil: null, autoRenew: false, locked: false })),
+      myEntries, due: [], coinsPerMonth: 0, isAdmin: true, storage, range, categories,
+    })
   }
-  const paid = process.env.NEXT_PUBLIC_IS_PAID === 'true'
   return NextResponse.json({
-    entries: entries.map(({ id, name, platform, category, kind, fromPage, toPage, createdAt }) => ({ id, name, platform, category, kind, fromPage, toPage, createdAt, locked: !unlocked.includes(id) })),
+    entries: entries.map(({ id, name, platform, category, kind, fromPage, toPage, createdAt }) => {
+      const plan = doc.plans[id]
+      const status = planStatus(plan, now)
+      return { id, name, platform, category, kind, fromPage, toPage, createdAt, saved: myEntries.includes(id), status, paidUntil: plan?.paidUntil || null, autoRenew: !!plan?.autoRenew, locked: status !== 'active' }
+    }),
     myEntries,
+    due: dueForRenewal({ ...doc, myEntries }, now),
+    coinsPerMonth: await coinsPerMonth(req),
     isAdmin: false,
-    freeLeft: paid ? Math.max(0, PR_BILLING.freeUnlocks - unlocked.length) : Infinity,
-    coinsPerUnlock: paid ? PR_BILLING.displayCoins : 0,
   })
 }
 

@@ -21,8 +21,8 @@ export default function ResearchFilters({ r, v, onExport, canExport, pdfTitle })
       <div className="flex w-full flex-wrap items-center gap-2 px-4 py-2.5 sm:px-6 lg:px-10">
         {r.listReady && r.searches.length > 0 && <SearchPicker searches={r.searches} picked={r.picked} onPick={r.pick} />}
         {r.listReady && r.allSearches.length > 0 && (
-          <Link href={MY_ENTRIES_HREF} className={PILL} title="Save more entries to your list — or remove some — on My Entries">
-            <Plus size={15} /> Add Entries
+          <Link href={MY_ENTRIES_HREF} className={PILL} title="Save more entries to your list — or remove some — on Product Categories">
+            <Plus size={15} /> Add Cartegories
           </Link>
         )}
         {r.isAdmin && (

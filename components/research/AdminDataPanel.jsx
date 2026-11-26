@@ -68,7 +68,7 @@ export default function AdminDataPanel({ storage: initial, onChanged }) {
     },
     wipe: {
       title: 'Delete ALL Product Research data?',
-      description: 'Every entry, every saved product and all its history, and every user’s unlocks — gone. Accounts and coins are in the admin panel and are not touched. This can’t be undone.',
+      description: 'Every entry, every saved product and all its history, and every user’s entry list and paid months — gone (coins already paid aren’t refunded). Accounts and coins are in the admin panel and are not touched. This can’t be undone.',
       label: 'Delete everything',
     },
   };
@@ -84,7 +84,7 @@ export default function AdminDataPanel({ storage: initial, onChanged }) {
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         <Stat label="Entries" value={fmtInt(s.entries || 0)} sub={`${fmtInt(s.autoDaily || 0)} read every day`} />
-        <Stat label="Users who unlocked" value={fmtInt(s.users || 0)} />
+        <Stat label="Users with entries" value={fmtInt(s.users || 0)} />
         <Stat label="Saved lists" value={fmtInt(s.tracks || 0)} sub="products + daily history" />
         <Stat label="Unused" value={fmtInt(unused)} sub="saved lists no entry uses" />
         <Stat label="Storage used" value={size(s.bytes || 0)} />
@@ -117,7 +117,7 @@ export default function AdminDataPanel({ storage: initial, onChanged }) {
 
         <div className="flex flex-col gap-2 rounded-xl border border-neg/30 bg-neg/5 p-3">
           <p className="flex items-center gap-1.5 text-sm font-semibold text-neg"><Trash2 size={15} /> Delete everything</p>
-          <p className="text-xs text-muted">Every entry and all its data, and every user’s unlocks — a fresh start. Accounts and coins are not touched. You’ll type DELETE to confirm.</p>
+          <p className="text-xs text-muted">Every entry and all its data, and every user’s entry list and paid months — a fresh start. Accounts and coins are not touched. You’ll type DELETE to confirm.</p>
           <button type="button" onClick={() => setConfirm('wipe')} className="mt-auto inline-flex w-fit items-center gap-1.5 rounded-full bg-neg px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90">
             <Trash2 size={14} /> Delete all data
           </button>
