@@ -11,16 +11,16 @@ import PlatformBadge from './PlatformBadge';
 
 export const MY_ENTRIES_HREF = '/product-research/my-entries';
 
-// "Entries ▾" — pick several. It lists the entries this user saved on My
-// Entries (every entry when they saved none): name, market place, pages, a
-// lock on the ones not unlocked yet. Search by name, market place or
-// category; tick up to MAX_PICK; Show opens them together in Daily History.
-// `searches` = the listed entries, `picked` = the ticked ids,
-// `onPick(ids)`, `saved` = how many the user saved (0 → "all entries").
-export default function SearchPicker({ searches = [], picked = [], onPick, saved = 0 }) {
+// "Entries ▾" — pick several. It lists ONLY the entries this user saved on
+// My Entries: name, market place, pages, a lock on the ones not unlocked
+// yet. Nothing is ticked at first. Search by name, market place or
+// category; tick up to MAX_PICK; Show opens them together in Daily History
+// (Show with none ticked clears it).
+// `searches` = the listed entries, `picked` = the ticked ids, `onPick(ids)`.
+export default function SearchPicker({ searches = [], picked = [], onPick }) {
   const chosen = searches.filter((s) => picked.includes(s.id));
   const lockedCount = chosen.filter((s) => s.locked).length;
-  const text = !chosen.length ? `Entries (${searches.length})` : chosen.length === 1 ? chosen[0].name : `${chosen.length} entries`;
+  const text = !chosen.length ? `Pick entries (${searches.length})` : chosen.length === 1 ? chosen[0].name : `${chosen.length} entries`;
 
   return (
     <Popover
@@ -35,12 +35,12 @@ export default function SearchPicker({ searches = [], picked = [], onPick, saved
         </button>
       )}
     >
-      {(close) => <PickList searches={searches} picked={picked} saved={saved} onPick={onPick} close={close} />}
+      {(close) => <PickList searches={searches} picked={picked} onPick={onPick} close={close} />}
     </Popover>
   );
 }
 
-function PickList({ searches, picked, saved, onPick, close }) {
+function PickList({ searches, picked, onPick, close }) {
   const [q, setQ] = useState('');
   const [ticked, setTicked] = useState(() => picked.filter((id) => searches.some((s) => s.id === id)));
   const listed = searches.filter((s) => matchesSearch(`${s.name} ${s.platform} ${s.category}`, q));
@@ -51,7 +51,7 @@ function PickList({ searches, picked, saved, onPick, close }) {
   const toggleAll = () => setTicked((cur) => (allTicked
     ? cur.filter((id) => !listed.some((s) => s.id === id))
     : [...cur, ...listed.map((s) => s.id).filter((id) => !cur.includes(id))].slice(0, MAX_PICK)));
-  const show = () => { if (!ticked.length) return; onPick(ticked); close(); };
+  const show = () => { onPick(ticked); close(); };
   // Enter in the search box with exactly one match: show just that one.
   const onEnter = () => { if (listed.length === 1) { onPick([listed[0].id]); close(); } else show(); };
 
@@ -92,12 +92,12 @@ function PickList({ searches, picked, saved, onPick, close }) {
       </div>
       {full && <p className="px-1 text-[11px] text-subtle">At most {MAX_PICK} entries at once.</p>}
       <div className="flex items-center gap-2">
-        <Link href={MY_ENTRIES_HREF} className="text-[12px] font-semibold text-link hover:underline" title={saved ? 'Add or remove entries in this list' : 'Save the entries you work with — then only those show here'}>
-          {saved ? 'Manage my entries' : 'Save my entries'}
+        <Link href={MY_ENTRIES_HREF} className="text-[12px] font-semibold text-link hover:underline" title="Add or remove entries in this list">
+          Manage my entries
         </Link>
         <span className="ml-auto text-[11px] text-subtle">{ticked.length} selected</span>
         <button type="button" onClick={close} className="rounded-lg border border-divider-light px-2.5 py-1 text-[12px] font-medium text-muted hover:bg-card-hover">Cancel</button>
-        <button type="button" onClick={show} disabled={!ticked.length} className="rounded-lg bg-action px-3 py-1 text-[12px] font-semibold text-white hover:bg-action-hover disabled:opacity-40">Show</button>
+        <button type="button" onClick={show} disabled={!ticked.length && !picked.length} className="rounded-lg bg-action px-3 py-1 text-[12px] font-semibold text-white hover:bg-action-hover disabled:opacity-40">Show</button>
       </div>
     </div>
   );

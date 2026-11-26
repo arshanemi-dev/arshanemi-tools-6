@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { combineEntries, listedEntries, MAX_PICK, pickLabel, startPick } from '../lib/research/myEntries.js';
+import { combineEntries, listedEntries, pickLabel } from '../lib/research/myEntries.js';
 import { dailyRows, mergeProducts } from '../lib/research/metrics.js';
 
 // A throwaway folder: lib/blobStore.js writes ./.data/ under the working
@@ -24,19 +24,11 @@ const E = [
 ];
 const ids = (list) => list.map((e) => e.id);
 
-test('Entries ▾ lists my saved entries — every entry when I saved none (or they were deleted)', () => {
-  assert.deepEqual(ids(listedEntries(E, [])), ['a', 'b', 'c']);
+test('Entries ▾ lists ONLY my saved entries — none saved, none listed', () => {
+  assert.deepEqual(ids(listedEntries(E, [])), []);
+  assert.deepEqual(ids(listedEntries(E, null)), []);
   assert.deepEqual(ids(listedEntries(E, ['c', 'a'])), ['a', 'c']); // the list's own order
-  assert.deepEqual(ids(listedEntries(E, ['gone'])), ['a', 'b', 'c']);
-});
-
-test('the pick to start with: the remembered ones still listed, else the first unlocked one', () => {
-  assert.deepEqual(startPick(E, ['c', 'gone', 'a']), ['c', 'a']);
-  assert.deepEqual(startPick(E, null), ['b']); // a is locked → b
-  assert.deepEqual(startPick([E[0]], []), ['a']); // only locked ones → the first
-  assert.deepEqual(startPick([], ['a']), []);
-  const many = Array.from({ length: 15 }, (_, i) => ({ id: `e${i}`, name: `e${i}` }));
-  assert.equal(startPick(many, many.map((e) => e.id)).length, MAX_PICK);
+  assert.deepEqual(ids(listedEntries(E, ['gone', 'b'])), ['b']); // a deleted entry is skipped
 });
 
 test('labels: one, two, or "+ N more"', () => {

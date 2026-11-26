@@ -126,7 +126,7 @@ export default function MyEntriesPage({ signedIn }) {
               })}
             </div>
           ) : (
-            <p className="text-xs text-muted">Nothing saved yet — press Add on the entries below. Until you save one, Product Research lists every entry.</p>
+            <p className="text-xs text-muted">Nothing saved yet — press Add on the entries below. Product Research’s Entries list shows only the ones saved here.</p>
           )}
         </section>
 

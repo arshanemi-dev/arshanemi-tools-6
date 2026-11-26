@@ -1,7 +1,10 @@
 'use client';
 
-import { AlertTriangle, Loader2, Lock, Unlock } from 'lucide-react';
+import Link from 'next/link';
+import { AlertTriangle, Layers, Loader2, Lock, MousePointerClick, Plus, Unlock } from 'lucide-react';
+import { MAX_PICK } from '@/lib/research/myEntries';
 import EmptyState, { NoProducts } from './EmptyState';
+import { MY_ENTRIES_HREF } from './SearchPicker';
 import LoadingPanel from './LoadingPanel';
 import MarketplaceStatus from './MarketplaceStatus';
 import PlatformBadge from './PlatformBadge';
@@ -11,6 +14,8 @@ import PlatformBadge from './PlatformBadge';
 //   signed out                        → what the tool does + Log in
 //   list loading / entries opening    → placeholders
 //   no entries yet                    → the admin: add one · others: none yet
+//   none saved on My Entries          → Add Entries
+//   nothing ticked in Entries ▾       → pick some (the page opens this way)
 //   every ticked entry locked         → an Unlock card each (first free, then coins)
 //   none could open                   → why + Try again
 //   read, but nothing found           → why (the admin can Search now)
@@ -21,8 +26,20 @@ export default function ResearchBody({ signedIn, r, v, children }) {
   let body;
   if (!signedIn) body = <EmptyState signedIn={false} cost={r.cost} />;
   else if (!r.listReady) body = <LoadingPanel kind="list" />;
-  else if (!r.searches.length) body = <EmptyState signedIn isAdmin={r.isAdmin} cost={r.cost} />;
-  else if (r.loading) body = <LoadingPanel kind="open" label={v.activeLabel} />;
+  else if (!r.allSearches.length) body = <EmptyState signedIn isAdmin={r.isAdmin} cost={r.cost} />;
+  else if (!r.searches.length) {
+    body = (
+      <Prompt icon={Layers} title="Save the entries you work with" action>
+        Add entries to your list on My Entries — then they show in Entries ▾ here, and you can tick several to see them together.
+      </Prompt>
+    );
+  } else if (!r.picked.length) {
+    body = (
+      <Prompt icon={MousePointerClick} title="Pick entries to see their Daily History">
+        Open <span className="font-semibold text-foreground">Pick entries ▾</span> above and tick one or more of your {r.searches.length} saved {r.searches.length === 1 ? 'entry' : 'entries'} — up to {MAX_PICK} together.
+      </Prompt>
+    );
+  } else if (r.loading) body = <LoadingPanel kind="open" label={v.activeLabel} />;
   else if (!r.data && locked.length) {
     body = (
       <div className="flex flex-wrap justify-center gap-4">
@@ -48,6 +65,22 @@ export default function ResearchBody({ signedIn, r, v, children }) {
     );
   }
   return <div className="flex w-full flex-col gap-4 px-4 py-4 sm:px-6 lg:px-10">{body}</div>;
+}
+
+// A centred card that says what to do next; `action` adds the Add Entries button.
+function Prompt({ icon: Icon, title, children, action = false }) {
+  return (
+    <div className="mx-auto flex w-full max-w-lg flex-col items-center gap-3 rounded-2xl border border-divider bg-background p-6 text-center">
+      <span className="flex h-12 w-12 items-center justify-center rounded-full bg-card"><Icon size={20} className="text-accent" /></span>
+      <h2 className="text-lg font-semibold text-foreground">{title}</h2>
+      <p className="text-sm text-muted">{children}</p>
+      {action && (
+        <Link href={MY_ENTRIES_HREF} className="inline-flex items-center gap-1.5 rounded-full bg-accent px-5 py-2 text-sm font-semibold text-white hover:bg-accent-hover">
+          <Plus size={15} /> Add Entries
+        </Link>
+      )}
+    </div>
+  );
 }
 
 // Free, or what it costs — the user's free unlocks left come from the list
