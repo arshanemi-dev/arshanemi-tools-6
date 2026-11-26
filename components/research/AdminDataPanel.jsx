@@ -83,7 +83,7 @@ export default function AdminDataPanel({ storage: initial, onChanged }) {
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        <Stat label="Entries" value={fmtInt(s.entries || 0)} sub={`${fmtInt(s.autoDaily || 0)} read every day`} />
+        <Stat label="Entries" value={fmtInt(s.entries || 0)} sub={`${fmtInt(s.autoDaily || 0)} read by themselves`} />
         <Stat label="Users with entries" value={fmtInt(s.users || 0)} />
         <Stat label="Saved lists" value={fmtInt(s.tracks || 0)} sub="products + daily history" />
         <Stat label="Unused" value={fmtInt(unused)} sub="saved lists no entry uses" />

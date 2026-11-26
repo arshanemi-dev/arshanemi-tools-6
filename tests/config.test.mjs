@@ -62,8 +62,20 @@ test('editing a row: new name + new history when what it reads changes; checks l
 
   const daily = entries.editEntry(e, { autoDaily: false }, all);
   assert.equal(daily.entry.autoDaily, false);
+  assert.equal(daily.entry.everyDays, 0);
   assert.equal(daily.newHistory, false);
   assert.equal(daily.entry.trackId, e.trackId);
+
+  // Read every N days + products per page: saved, same history; bad numbers refused.
+  const numbers = entries.editEntry(e, { everyDays: 3, maxPerPage: '20' }, all);
+  assert.deepEqual([numbers.entry.everyDays, numbers.entry.autoDaily, numbers.entry.maxPerPage], [3, true, 20]);
+  assert.equal(numbers.entry.trackId, e.trackId);
+  assert.equal(entries.editEntry(e, { maxPerPage: '' }, all).entry.maxPerPage, null);
+  assert.match(entries.editEntry(e, { everyDays: 400 }, all).error, /0 to 365/);
+  assert.match(entries.editEntry(e, { maxPerPage: -2 }, all).error, /1 to 500/);
+  const fresh = entries.makeEntry({ platform: 'meesho', category: 'sarees', everyDays: 7, maxPerPage: 30 }, all, await config.readRange()).entry;
+  assert.deepEqual([fresh.everyDays, fresh.autoDaily, fresh.maxPerPage], [7, true, 30]);
+  assert.equal(entries.jobOfEntry(fresh).maxPerPage, 30);
 
   const moved = entries.editEntry(e, { category: 'Kurta Sets' }, all);
   assert.equal(moved.entry.name, 'flipkart_kurta-sets');

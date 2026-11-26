@@ -111,7 +111,9 @@ const endLabels = {
   },
 };
 
-export default function LineChart({ series = [], days: daysIn = null, invert = false, format = (v) => String(v), toggles = false, height = 300, emptyText = 'No history for this range yet — snapshots build up day by day.' }) {
+// `fill` = grow to the height the parent gives (the parent must be a flex
+// column); `height` is then the smallest it gets.
+export default function LineChart({ series = [], days: daysIn = null, invert = false, format = (v) => String(v), toggles = false, height = 300, fill = false, emptyText = 'No history for this range yet — snapshots build up day by day.' }) {
   const colors = useThemeColors();
   const [hidden, setHidden] = useState(() => new Set());
   const drawn = useMemo(() => series.filter((s) => s.points.length), [series]);
@@ -202,8 +204,9 @@ export default function LineChart({ series = [], days: daysIn = null, invert = f
     };
   }, [colors, days, invert, format, shownCount, reduceMotion]);
 
+  const size = fill ? { minHeight: height } : { height };
   if (!drawn.length) {
-    return <div className="flex items-center justify-center rounded-xl border border-dashed border-divider text-center text-xs text-subtle" style={{ height }}>{emptyText}</div>;
+    return <div className={`flex items-center justify-center rounded-xl border border-dashed border-divider text-center text-xs text-subtle ${fill ? 'flex-1' : ''}`} style={size}>{emptyText}</div>;
   }
 
   const toggle = (key) => setHidden((cur) => {
@@ -213,7 +216,7 @@ export default function LineChart({ series = [], days: daysIn = null, invert = f
   });
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className={`flex flex-col gap-2 ${fill ? 'min-h-0 flex-1' : ''}`}>
       {toggles && drawn.length > 1 && (
         <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Lines on the chart">
           <button type="button" onClick={() => setHidden(new Set())} disabled={!hidden.size} className="inline-flex items-center gap-1 rounded-full border border-divider-light px-2.5 py-1 text-[11px] font-semibold text-foreground hover:bg-card-hover disabled:opacity-40">
@@ -242,7 +245,7 @@ export default function LineChart({ series = [], days: daysIn = null, invert = f
           })}
         </div>
       )}
-      <div className="relative w-full" style={{ height }}>
+      <div className={`relative w-full ${fill ? 'min-h-0 flex-1 overflow-hidden' : ''}`} style={size}>
         {data && options
           ? <Line data={data} options={options} plugins={[hoverLine, endLabels]} aria-label="Line chart" role="img" />
           : <div className="h-full w-full animate-pulse rounded-xl bg-card" />}

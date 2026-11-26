@@ -65,17 +65,19 @@ export default function ProductDetailsModal({ product, summary, refDay, onClose 
         <Segmented items={DETAIL_RANGES} value={range} onChange={setRange} label="Range" />
       </div>
 
-      {/* Graphs and table side by side on wide screens, one under the other on small ones */}
-      <div className="grid items-start gap-4 xl:grid-cols-2">
-        <div className="grid min-w-0 gap-3 sm:grid-cols-2">
+      {/* Graphs and table side by side on wide screens, filling the rest of
+          the page's height; one under the other on small screens */}
+      <div className="grid gap-4 xl:min-h-[30rem] xl:flex-1 xl:grid-cols-2">
+        <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-rows-2">
           {METRICS.map((m) => (
-            <div key={m.id} className="min-w-0 rounded-2xl border border-divider bg-background p-3">
+            <div key={m.id} className="flex min-w-0 flex-col rounded-2xl border border-divider bg-background p-3">
               <h3 className="mb-1 text-sm font-semibold text-foreground">{m.label}</h3>
               <LineChart
                 series={seriesFor([product], m.id, refDay, range).map((s) => ({ ...s, title: m.label, slot: 0 }))}
                 invert={!!m.invert}
                 format={m.format}
-                height={200}
+                height={180}
+                fill
                 emptyText={m.id === 'bought' ? 'Only Amazon shows a bought count.' : undefined}
               />
             </div>
@@ -84,7 +86,15 @@ export default function ProductDetailsModal({ product, summary, refDay, onClose 
 
         <div className="flex min-w-0 flex-col gap-2">
           <h3 className="text-sm font-semibold text-foreground">Day by day</h3>
-          <ResearchTable columns={cols} rows={days} defaultSort={{ key: 'date', dir: 'desc' }} emptyText="No snapshots yet." totalLabel="Average" />
+          <ResearchTable
+            columns={cols}
+            rows={days}
+            defaultSort={{ key: 'date', dir: 'desc' }}
+            emptyText="No snapshots yet."
+            totalLabel="Average"
+            className="xl:flex xl:min-h-0 xl:flex-1 xl:flex-col"
+            scrollClassName="max-h-[70vh] xl:max-h-none xl:min-h-0 xl:flex-1"
+          />
         </div>
       </div>
     </Modal>

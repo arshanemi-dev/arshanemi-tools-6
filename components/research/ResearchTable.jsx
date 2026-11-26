@@ -48,6 +48,9 @@ export default function ResearchTable({
   tickPurpose = 'in the graphs', tickedSummary = 'in graphs',
   // Rows drawn first, outside sorting / filters / paging (an editable new row).
   pinnedRows = [],
+  // Extra classes for the outer box and for the scrolling part — e.g. to
+  // let the table grow to its parent's height instead of stopping at 70vh.
+  className = '', scrollClassName = 'max-h-[70vh]',
 }) {
   const [sort, setSort] = useState(defaultSort);
   const [filters, setFilters] = useState({});
@@ -98,7 +101,7 @@ export default function ResearchTable({
   const allChecked = selectable && pageRows.length > 0 && pageRows.every((r) => selectedKeys.has(r.key));
 
   return (
-    <div className="overflow-hidden rounded-xl border border-divider bg-background">
+    <div className={`overflow-hidden rounded-xl border border-divider bg-background ${className}`}>
       {applied.length > 0 && (
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-divider bg-action-soft px-3 py-1.5 text-xs text-foreground">
           <span>
@@ -107,7 +110,7 @@ export default function ResearchTable({
           <button type="button" onClick={() => setFilters({})} className="font-semibold text-link hover:underline">Clear all filters</button>
         </div>
       )}
-      <div data-table-scroll className={`max-h-[70vh] overflow-auto ${filterOpen ? 'min-h-[30rem]' : ''}`}>
+      <div data-table-scroll className={`${scrollClassName} overflow-auto ${filterOpen ? 'min-h-[30rem]' : ''}`}>
         <table className={`${styles.table} text-sm`}>
           <thead className="sticky top-0 z-10">
             <tr>

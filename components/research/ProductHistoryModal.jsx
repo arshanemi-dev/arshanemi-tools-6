@@ -129,33 +129,21 @@ export default function ProductHistoryModal({ product, refDay, onClose }) {
       {/* What to look at — buttons, not dropdowns */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <Segmented items={PERIODS} value={period} onChange={setPeriod} label="Period" />
-        <Segmented items={CHARTABLE} value={metric} onChange={setMetric} label="Chart" />
+        {/* <Segmented items={CHARTABLE} value={metric} onChange={setMetric} label="Chart" /> */}
       </div>
 
       {row && <TrendTiles metric={metric} row={row} trend={trend} />}
 
-      {/* Chart and table side by side on wide screens, one under the other on small ones */}
-      <div className="grid items-start gap-4 lg:grid-cols-2">
-        <section className="min-w-0 rounded-2xl border border-divider bg-background p-3">
-          <h3 className="mb-1 text-sm font-semibold text-foreground">
-            {label} {row?.kind === 'avg' ? `— average per ${unit}` : row?.kind === 'gain' ? `per ${unit}` : row?.kind === 'last' ? `— at the end of each ${unit}` : ''}
-            {metric === 'rank' && <span className="ml-2 text-[11px] font-normal text-subtle">#1 at the top — higher on the chart = higher in the search results</span>}
-          </h3>
-          <HistoryTrendChart
-            labels={steps.map((s) => s.label)}
-            values={row?.values || []}
-            trend={trend}
-            invert={!!row?.invert}
-            format={FORMAT[metric]}
-            name={label}
-            height={300}
-          />
-        </section>
+      {/* Chart and table side by side on wide screens, filling the rest of the
+          page's height; one under the other on small screens */}
+      <div className="grid gap-4 lg:min-h-[26rem] lg:flex-1 lg:grid-cols-2">
+       
 
-        {/* Every measure × every step — Average and Total first, then the steps */}
+        {/* Every measure × every step — Average and Total first, then the steps.
+            On wide screens the rows spread out to the chart's height. */}
         <div className="flex min-w-0 flex-col gap-2">
-          <div className="overflow-x-auto rounded-xl border border-divider">
-            <table className="w-full border-collapse text-sm">
+          <div className="overflow-auto rounded-xl border border-divider bg-background lg:min-h-0 lg:flex-1">
+            <table className="w-full border-collapse text-sm lg:h-full">
               <thead>
                 <tr className="bg-[#1565C0] text-white">
                   <th className="sticky left-0 z-[1] bg-[#1565C0] px-3 py-1.5 text-left text-xs font-semibold">Measure</th>
@@ -199,6 +187,22 @@ export default function ProductHistoryModal({ product, refDay, onClose }) {
             Average and Total cover the whole period · Rank, Price, Rating and Bought: the average of the days in each column · Reviews: the count on its last day · Reviews gained: new reviews in it · “-” = no snapshot then.
           </p>
         </div>
+         <section className="flex min-w-0 flex-col rounded-2xl border border-divider bg-background p-3">
+          <h3 className="mb-1 text-sm font-semibold text-foreground">
+            {label} {row?.kind === 'avg' ? `— average per ${unit}` : row?.kind === 'gain' ? `per ${unit}` : row?.kind === 'last' ? `— at the end of each ${unit}` : ''}
+            {metric === 'rank' && <span className="ml-2 text-[11px] font-normal text-subtle">#1 at the top — higher on the chart = higher in the search results</span>}
+          </h3>
+          <HistoryTrendChart
+            labels={steps.map((s) => s.label)}
+            values={row?.values || []}
+            trend={trend}
+            invert={!!row?.invert}
+            format={FORMAT[metric]}
+            name={label}
+            height={300}
+            fill
+          />
+        </section>
       </div>
     </Modal>
   );

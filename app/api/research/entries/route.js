@@ -51,11 +51,13 @@ export async function GET(req) {
   })
 }
 
-// POST { platform, category, url?, autoDaily } — the master admin adds an
-// entry (a new row): name = "<marketplace>_<category>" (unique); `url` = the
-// one category / search page to read (empty = the marketplace's own search
-// for the category); pages = the shared range. Not read yet — Search reads
-// it. Its category joins the category list.
+// POST { platform, category, url?, everyDays?, maxPerPage? } — the master
+// admin adds an entry (a new row): name = "<marketplace>_<category>"
+// (unique); `url` = the one category / search page to read (empty = the
+// marketplace's own search for the category); pages = the shared range;
+// everyDays = read again by itself every N days (default 1, 0 = only by
+// Search); maxPerPage = keep only the first N products of each page (empty =
+// all). Not read yet — Search reads it. Its category joins the category list.
 // → 201 { entry } | 400 { error }
 export async function POST(req) {
   const { res } = await adminOnly(req)

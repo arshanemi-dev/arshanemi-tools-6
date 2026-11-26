@@ -10,9 +10,10 @@ import { useAdminEntries } from '@/lib/research/useAdminEntries';
 import { fmtDay, fmtInt } from '@/lib/research/format';
 import { MARKETPLACES, marketplaceName, readListingUrl } from '@/data/marketplaces';
 import { entryName } from '@/data/entryName';
+import { everyDaysOf, readEveryDays, readMaxPerPage } from '@/data/entrySettings';
 import ResearchTable from './ResearchTable';
 import PlatformBadge from './PlatformBadge';
-import ToggleSwitch from './ToggleSwitch';
+import NumberCell from './NumberCell';
 import ComboBox from './ComboBox';
 import PageRangePicker from './PageRangePicker';
 import PageCounts from './PageCounts';
@@ -24,17 +25,25 @@ import AdminDataPanel from './AdminDataPanel';
 const NEW = '__new__';
 const MARKET_OPTIONS = MARKETPLACES.map((m) => ({ value: m.id, label: m.name, color: m.color }));
 const BTN = 'inline-flex h-7 items-center gap-1 rounded-full px-2.5 text-xs font-semibold transition-colors disabled:opacity-40';
+// The word after a "Read every" box: 0 → "days · off", 1 → "day", 2 → "days".
+const daysWord = (n) => (n === 0 ? 'days · off' : n === 1 ? 'day' : 'days');
 
 // The New Search page (/product-research/new-search) — the master admin
 // only. Nothing of it is drawn until the server has confirmed the role.
 // Everything happens in the entries table:
 //   [+ Add] [Pages From–To] [Search] [Delete ticked] … [Import Sheet]
 //   + Add puts an editable row on top: Market place and Category are
-//   searchable dropdowns (a new category: type it + Enter), the link, the
-//   Daily switch, then Save / Close. Every row's Actions: Edit (the row turns
-//   into the same inputs, Save / Close) and Delete. The Pages above are the
-//   ONE range every entry is read with — by Search (the ticked rows) and by
-//   the daily read (rows with Daily on). A name opens its products below.
+//   searchable dropdowns (a new category: type it + Enter), the link,
+//   Products / Page and Read every N days, then Save / Close. Every row's
+//   Actions: Edit (the row turns into the same inputs, Save / Close) and
+//   Delete. The two numbers can also be typed straight into any row (Enter
+//   saves):
+//     Products / Page  keep only the first N products of every page (empty =
+//                      all) — ranks stay the real place on the market place
+//     Read every       read again by itself every N days (0 = only Search)
+//   The Pages above are the ONE range every entry is read with — by Search
+//   (the ticked rows) and by the automatic reads. A name opens its products
+//   below.
 export default function NewSearchPage({ signedIn }) {
   const { addToast } = useToast();
   const a = useAdminEntries({ signedIn, addToast });
@@ -42,7 +51,7 @@ export default function NewSearchPage({ signedIn }) {
   const [shownId, setShownId] = useState(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [confirm, setConfirm] = useState(null); // { ids, label }
-  const [editing, setEditing] = useState(null); // { id (NEW or an entry id), platform, category, url, autoDaily }
+  const [editing, setEditing] = useState(null); // { id (NEW or an entry id), platform, category, url, everyDays, maxPerPage } — the two numbers as typed
 
   // The list, plus the category of the row being edited if it isn't in it.
   const editingCategory = editing?.category || '';
@@ -62,15 +71,21 @@ export default function NewSearchPage({ signedIn }) {
     const linkError = link?.error || (link?.url && editing.platform && link.platform !== editing.platform ? `That’s a ${marketplaceName(link.platform)} link, not ${marketplaceName(editing.platform)}` : null);
     const before = a.entries.find((e) => e.id === editing.id);
     const newHistory = !!before && (before.platform !== editing.platform || before.category !== editing.category.trim() || (before.url || '') !== (link?.url || editing.url.trim()));
-    return { name, nameTaken, linkError, ok: !!name && !nameTaken && !linkError, newHistory, url: link?.url || '' };
+    const every = readEveryDays(editing.everyDays);
+    const perPage = readMaxPerPage(editing.maxPerPage);
+    return {
+      name, nameTaken, linkError, newHistory, url: link?.url || '',
+      everyError: every.error || null, everyDays: every.value, perPageError: perPage.error || null, maxPerPage: perPage.value,
+      ok: !!name && !nameTaken && !linkError && !every.error && !perPage.error,
+    };
   }, [editing, a.entries]);
 
-  const startAdd = () => { setEditing({ id: NEW, platform: null, category: '', url: '', autoDaily: true }); };
-  const startEdit = (e) => setEditing({ id: e.id, platform: e.platform, category: e.category, url: e.url || '', autoDaily: e.autoDaily !== false });
+  const startAdd = () => { setEditing({ id: NEW, platform: null, category: '', url: '', everyDays: '1', maxPerPage: '' }); };
+  const startEdit = (e) => setEditing({ id: e.id, platform: e.platform, category: e.category, url: e.url || '', everyDays: String(everyDaysOf(e)), maxPerPage: e.maxPerPage ? String(e.maxPerPage) : '' });
   const set = (patch) => setEditing((cur) => ({ ...cur, ...patch }));
   const save = async () => {
     if (!check?.ok) return;
-    const row = { platform: editing.platform, category: editing.category.trim(), url: check.url, autoDaily: editing.autoDaily };
+    const row = { platform: editing.platform, category: editing.category.trim(), url: check.url, everyDays: check.everyDays, maxPerPage: check.maxPerPage };
     if (editing.id === NEW) {
       const made = await a.add(row);
       if (made) { setEditing(null); setTicked((cur) => new Set(cur).add(made.id)); setShownId(made.id); }
@@ -88,6 +103,12 @@ export default function NewSearchPage({ signedIn }) {
   // one click ticks just these, so Search reads again only what needs it.
   const needFix = useMemo(() => a.entries.filter((e) => e.kind !== 'import' && hasPageProblem(e)).map((e) => e.id), [a.entries]);
   const isEdit = (r) => editing?.id === r.key;
+  // A number typed straight into a row → checked, then saved (or why not).
+  const saveNumber = (r, key, text) => {
+    const read = key === 'everyDays' ? readEveryDays(text) : readMaxPerPage(text);
+    if (read.error) { addToast(read.error, 'error'); return; }
+    a.setSetting(r, { [key]: read.value });
+  };
 
   const columns = [
     {
@@ -137,9 +158,28 @@ export default function NewSearchPage({ signedIn }) {
     },
     { key: 'products', label: 'Products', numeric: true, value: (r) => r.products, text: (r) => (r.key === NEW ? '' : fmtInt(r.products)), total: 'sum', totalFormat: fmtInt },
     {
+      // Typed by the admin (data/entrySettings.js) — used from the next Search.
+      key: 'maxPerPage', label: 'Products / Page', numeric: true,
+      description: 'How many products Search keeps from every page: the first N (ads not counted). Empty = every product on the page. Ranks stay the real place on the market place. Type a number, then Enter — it’s used from the next Search.',
+      value: (r) => (r.key === NEW || r.kind === 'import' ? null : r.maxPerPage || null),
+      text: (r) => (r.kind === 'import' ? '-' : r.key === NEW ? '' : r.maxPerPage ? String(r.maxPerPage) : 'All'),
+      render: (r) => {
+        if (r.kind === 'import') return <span className="text-xs text-subtle">-</span>;
+        if (isEdit(r)) {
+          return (
+            <span className="inline-flex flex-col items-start gap-0.5">
+              <NumberCell value={editing.maxPerPage} onChange={(maxPerPage) => set({ maxPerPage })} placeholder="All" min={1} label="Products to keep from every page (empty = all)" invalid={!!check?.perPageError} />
+              {check?.perPageError && <span className="max-w-[12rem] whitespace-normal text-[11px] text-neg">1–500, or empty for all</span>}
+            </span>
+          );
+        }
+        return <NumberCell value={r.maxPerPage || ''} onCommit={(t) => saveNumber(r, 'maxPerPage', t)} placeholder="All" min={1} busy={a.saving.has(r.id) || !!editing} label={`Products ${r.name} keeps from every page (empty = all) — Enter saves`} />;
+      },
+    },
+    {
       // Filled in by Search itself — nothing to type (lib/research/pageCounts.js).
-      key: 'pageCounts', label: 'Products / Page', wrap: true,
-      description: 'What each page gave on the last Search: the new products it added (a product already on an earlier page isn’t counted twice), then the total. Amber = a page that probably didn’t load fully; red = a page that couldn’t be read. Hover a page for listed / new / ads. Sorts by the total.',
+      key: 'pageCounts', label: 'Found / Page', wrap: true,
+      description: 'What each page gave on the last Search: the new products it kept (a product already on an earlier page isn’t counted twice; at most Products / Page), then the total. Amber = a page that probably didn’t load fully; red = a page that couldn’t be read. Hover a page for listed / new / ads. Sorts by the total.',
       value: (r) => (r.key === NEW ? null : pageStates(r)?.total ?? null),
       text: (r) => (r.key === NEW ? '' : pageCountsText(r)),
       total: 'sum', totalFormat: fmtInt,
@@ -156,13 +196,24 @@ export default function NewSearchPage({ signedIn }) {
       )),
     },
     {
-      key: 'autoDaily', label: 'Daily', description: 'On = read again automatically every day. Off = never automatically — only when you press Search.',
-      value: (r) => (r.kind === 'import' ? '' : r.autoDaily !== false ? 'On' : 'Off'), text: (r) => (r.kind === 'import' ? '-' : r.autoDaily !== false ? 'On' : 'Off'),
-      render: (r) => (r.kind === 'import'
-        ? <span className="text-xs text-subtle">-</span>
-        : isEdit(r)
-          ? <ToggleSwitch on={editing.autoDaily} onChange={(autoDaily) => set({ autoDaily })} label="Read automatically every day" />
-          : <ToggleSwitch on={r.autoDaily !== false} onChange={(on) => a.toggle(r.id, on)} busy={a.saving.has(r.id)} label={`Read ${r.name} automatically every day`} />),
+      key: 'everyDays', label: 'Read Every', numeric: true,
+      description: 'Read again by itself every N days: 1 = every day, 2 = every 2 days, 7 = once a week … 0 = never by itself, only when you press Search. Type a number, then Enter.',
+      value: (r) => (r.key === NEW || r.kind === 'import' ? null : everyDaysOf(r)),
+      text: (r) => (r.kind === 'import' ? '-' : r.key === NEW ? '' : String(everyDaysOf(r))),
+      render: (r) => {
+        if (r.kind === 'import') return <span className="text-xs text-subtle">-</span>;
+        if (isEdit(r)) {
+          const n = check?.everyDays;
+          return (
+            <span className="inline-flex flex-col items-start gap-0.5">
+              <NumberCell value={editing.everyDays} onChange={(everyDays) => set({ everyDays })} suffix={check?.everyError ? 'days' : daysWord(n)} label="Read again by itself every N days (0 = only by Search)" invalid={!!check?.everyError} />
+              {check?.everyError && <span className="max-w-[12rem] whitespace-normal text-[11px] text-neg">0–365 (0 = only by Search)</span>}
+            </span>
+          );
+        }
+        const n = everyDaysOf(r);
+        return <NumberCell value={n} onCommit={(t) => saveNumber(r, 'everyDays', t)} suffix={daysWord(n)} busy={a.saving.has(r.id) || !!editing} label={`Read ${r.name} again by itself every N days (0 = only by Search) — Enter saves`} />;
+      },
     },
     {
       key: 'actions', label: 'Actions', value: () => '', text: () => '',
@@ -226,8 +277,8 @@ export default function NewSearchPage({ signedIn }) {
             <FileIconButton icon={FileUp} label="Import Sheet" title="Add a sheet you already have as an entry — columns Link, Date, Price, Review, Rating, Ranking (Bought optional)" accept=".xlsx,.xls,.csv" multiple={false} tone="outline" onFiles={async (f) => { const e = await a.importFile(f[0]); if (e) setShownId(e.id); }} disabled={busy || !!editing} />
           </div>
           <p className="text-xs text-muted">
-            {a.entries.length ? `${a.entries.length} entries · ${a.entries.filter((e) => e.autoDaily !== false && e.kind !== 'import').length} read every day · ${needFix.length ? `${needFix.length} with a bad page · ` : ''}` : ''}
-            Every entry is read with pages {a.range.fromPage}–{a.range.toPage} (by Search and the daily read). Changing the pages starts a new history for an entry on its next read — switching back brings the old one back.
+            {a.entries.length ? `${a.entries.length} entries · ${a.entries.filter((e) => everyDaysOf(e) > 0 && e.kind !== 'import').length} read by themselves · ${needFix.length ? `${needFix.length} with a bad page · ` : ''}` : ''}
+            Every entry is read with pages {a.range.fromPage}–{a.range.toPage} (by Search and the automatic reads). Changing the pages starts a new history for an entry on its next read — switching back brings the old one back.
           </p>
         </section>
 

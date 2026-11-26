@@ -34,13 +34,15 @@ export async function GET(req, { params }) {
       coinsPerMonth: await coinsPerMonth(req),
     }, { status: 402 })
   }
-  const shown = isAdmin(payload) ? entry : { ...entry, url: undefined, autoDaily: undefined }
+  const shown = isAdmin(payload) ? entry : { ...entry, url: undefined, autoDaily: undefined, everyDays: undefined, maxPerPage: undefined }
   return NextResponse.json(await searchPayload(entryAsSearch(shown)))
 }
 
 // PATCH — the master admin edits a row: any of { platform, category, url,
-// autoDaily }. Same checks as adding (lib/research/entries.js editEntry);
-// changing what it reads gives it a new name and a new history.
+// everyDays (read every N days, 0 = only by Search), maxPerPage (keep the
+// first N products of each page, empty = all) } — or the older autoDaily.
+// Same checks as adding (lib/research/entries.js editEntry); changing what
+// it reads gives it a new name and a new history.
 // → { entry, newHistory } | 400 { error } | 404
 export async function PATCH(req, { params }) {
   const { res } = await adminOnly(req)
@@ -52,6 +54,9 @@ export async function PATCH(req, { params }) {
     if (typeof body.autoDaily !== 'boolean') return NextResponse.json({ error: 'autoDaily must be true or false' }, { status: 400 })
     changes.autoDaily = body.autoDaily
   }
+  // Checked by editEntry (data/entrySettings.js) — a bad number is a 400.
+  if ('everyDays' in body) changes.everyDays = body.everyDays
+  if ('maxPerPage' in body) changes.maxPerPage = body.maxPerPage
   if ('platform' in body) changes.platform = String(body.platform || '')
   if ('category' in body) changes.category = String(body.category || '')
   if ('url' in body) {

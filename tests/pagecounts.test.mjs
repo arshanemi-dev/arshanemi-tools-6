@@ -7,10 +7,10 @@ const ps = (ids, ads = []) => ids.map((id) => ({ id, link: `https://x/${id}`, sp
 
 test('a page is counted against the pages before it: listed, new, ads', () => {
   const seen = new Set();
-  assert.deepEqual(countPage(ps(['a', 'b', 'ad1', 'c'], ['ad1']), seen), { shown: 4, added: 4, ads: 1 });
+  assert.deepEqual(countPage(ps(['a', 'b', 'ad1', 'c'], ['ad1']), seen), { shown: 4, added: 4, ads: 1, fresh: 4 });
   // page 2 repeats b and c — only d and e are new; the same id twice on one page counts once
-  assert.deepEqual(countPage(ps(['b', 'c', 'd', 'e', 'e']), seen), { shown: 5, added: 2, ads: 0 });
-  assert.deepEqual(countPage(ps(['a', 'd']), seen), { shown: 2, added: 0, ads: 0 }); // nothing new: results ended
+  assert.deepEqual(countPage(ps(['b', 'c', 'd', 'e', 'e']), seen), { shown: 5, added: 2, ads: 0, fresh: 2 });
+  assert.deepEqual(countPage(ps(['a', 'd']), seen), { shown: 2, added: 0, ads: 0, fresh: 0 }); // nothing new: results ended
   assert.equal(seen.size, 6); // a, b, ad1, c, d, e
 });
 

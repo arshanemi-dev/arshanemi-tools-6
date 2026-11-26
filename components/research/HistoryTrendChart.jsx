@@ -18,7 +18,9 @@ ChartJS.register(LineController, LineElement, PointElement, CategoryScale, Linea
 // trend — a reference line, never a status colour).
 // `labels` = the steps' names, `values` = the step values (null = a gap),
 // `trend` = trendOf(values) (or null), `invert` = rank (#1 at the top).
-export default function HistoryTrendChart({ labels, values, trend, invert = false, format = (v) => String(v), name, height = 240 }) {
+// `fill` = grow to the height the parent gives (the parent must be a flex
+// column); `height` is then the smallest it gets.
+export default function HistoryTrendChart({ labels, values, trend, invert = false, format = (v) => String(v), name, height = 240, fill = false }) {
   const colors = useThemeColors();
   const reduceMotion = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   const has = values.some((v) => v != null);
@@ -104,13 +106,14 @@ export default function HistoryTrendChart({ labels, values, trend, invert = fals
     };
   }, [colors, invert, format, reduceMotion]);
 
+  const size = fill ? { minHeight: height } : { height };
   if (!has) {
-    return <div className="flex items-center justify-center rounded-xl border border-dashed border-divider text-center text-xs text-subtle" style={{ height }}>No values for this in the period yet — they build up day by day.</div>;
+    return <div className={`flex items-center justify-center rounded-xl border border-dashed border-divider text-center text-xs text-subtle ${fill ? 'flex-1' : ''}`} style={size}>No values for this in the period yet — they build up day by day.</div>;
   }
 
   return (
-    <div className="flex flex-col gap-1.5">
-      <div className="relative w-full" style={{ height }}>
+    <div className={`flex flex-col gap-1.5 ${fill ? 'min-h-0 flex-1' : ''}`}>
+      <div className={`relative w-full ${fill ? 'min-h-0 flex-1 overflow-hidden' : ''}`} style={size}>
         {data && options
           ? <Line data={data} options={options} plugins={[hoverLine]} aria-label={`${name} per step, with its trend line`} role="img" />
           : <div className="h-full w-full animate-pulse rounded-xl bg-card" />}
