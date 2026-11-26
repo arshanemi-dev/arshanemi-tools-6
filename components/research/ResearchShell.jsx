@@ -9,8 +9,9 @@ import ResearchWorkspace from './ResearchWorkspace';
 const HEADER_HIDDEN = process.env.NEXT_PUBLIC_IS_Header_Hide === 'true';
 
 // Client shell (tools-5's ProfitLossShell): the topbar session, then the
-// workspace. The page opens signed out too; searching asks to sign in.
-export default function ResearchShell() {
+// page. Pages open signed out too; searching / Settings ask to sign in.
+// `children(signedIn)` draws the page (default: the research workspace).
+export default function ResearchShell({ children = (signedIn) => <ResearchWorkspace signedIn={signedIn} /> }) {
   const storedUser = useStoredUser(); // undefined until hydrated
   const [profile, setProfile] = useState(null);
   const user = storedUser && profile ? { ...storedUser, ...profile } : storedUser;
@@ -36,7 +37,7 @@ export default function ResearchShell() {
     <div className="flex h-screen flex-col overflow-hidden bg-surface">
       {!HEADER_HIDDEN && <DashboardTopbar user={user} onLogout={handleLogout} />}
       <div className="flex min-h-0 flex-1 overflow-hidden">
-        {user !== undefined && <ResearchWorkspace signedIn={!!user} />}
+        {user !== undefined && children(!!user, user)}
       </div>
     </div>
   );

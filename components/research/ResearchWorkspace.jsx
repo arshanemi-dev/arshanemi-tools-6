@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useMemo, useState } from 'react';
-import { FileSpreadsheet, FileText, LineChart, ListOrdered, RefreshCw, Rows3 } from 'lucide-react';
+import Link from 'next/link';
+import { FileSpreadsheet, FileText, LineChart, ListOrdered, RefreshCw, Rows3, Settings } from 'lucide-react';
 import { useToast } from '@/components/admin/Toast';
 import ConfirmDialog from '@/components/admin/ConfirmDialog';
 import BillingGateModal from '@/components/billing/BillingGateModal';
@@ -133,6 +134,9 @@ export default function ResearchWorkspace({ signedIn }) {
                 <IconButton icon={RefreshCw} label="Refresh" title="Read today's results now (free — once a day per market place / link)" onClick={() => r.refresh(r.activeId)} disabled={!r.activeId || !!r.busy || r.data?.search?.kind === 'import'} />
                 <IconButton icon={FileSpreadsheet} label="Excel" title="Download this table (filters and sort as shown) to Excel" onClick={() => doExport('xlsx')} disabled={!hasData} />
                 <IconButton icon={FileText} label="PDF" title="Download the cards, graph and this table to PDF" onClick={() => doExport('pdf')} disabled={!hasData} />
+                <Link href="/product-research/settings" title="Settings — delete searches and their data" aria-label="Settings" className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-divider-light bg-background text-muted transition-colors hover:border-divider hover:text-foreground">
+                  <Settings size={15} />
+                </Link>
               </div>
             </div>
           )}

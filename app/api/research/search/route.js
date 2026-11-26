@@ -104,8 +104,10 @@ export async function POST(req) {
     if (!existing) {
       search = { id: createHash('sha1').update(`${payload.userId}|${trackIds.join(',')}`).digest('hex').slice(0, 16), ...draft, trackIds, createdAt: new Date().toISOString(), coinsCharged: coins, free }
       await updateUserSearches(payload.userId, (list) => [search, ...list.filter((s) => s.id !== search.id)])
-      await registerTracks(results.map((r) => r.track))
     }
+    // This user owns these tracks (a reopened search too — that fills in
+    // owners for searches made before owners were recorded).
+    await registerTracks(results.map((r) => r.track), payload.userId)
     send({ type: 'result', data: { ...(await searchPayload(search)), results: perJob, charged: { coins, free, reopened: !!existing } } })
   })
 }

@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
 import { getAuthPayload } from '@/lib/auth'
-import { readUserSearches, updateUserSearches } from '@/lib/research/store'
+import { readUserSearches } from '@/lib/research/store'
 import { searchPayload } from '@/lib/research/service'
+import { deleteSearches } from '@/lib/research/cleanup'
 
 export const runtime = 'nodejs'
 
@@ -21,11 +22,13 @@ export async function GET(req, { params }) {
   return NextResponse.json(await searchPayload(search))
 }
 
-// DELETE → removes it from the user's list. The shared track data stays (other
-// users may track the same keyword); a coin already paid is not refunded.
+// DELETE → removes it from the user's list (lib/research/cleanup.js
+// deleteSearches): an imported sheet's data is deleted; a keyword / link
+// nobody else tracks stops being read every day and its data is deleted;
+// one someone else tracks stays for them. Coins already used aren't refunded.
+// → { ok, searches, deletedData, keptShared }
 export async function DELETE(req, { params }) {
   const { res, payload, search } = await ownSearch(req, params)
   if (res) return res
-  await updateUserSearches(payload.userId, (list) => list.filter((s) => s.id !== search.id))
-  return NextResponse.json({ ok: true })
+  return NextResponse.json({ ok: true, ...(await deleteSearches(payload.userId, [search.id])) })
 }
