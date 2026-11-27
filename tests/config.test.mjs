@@ -16,33 +16,16 @@ const { writeBlobJson } = await import('../lib/blobStore.js');
 
 await writeBlobJson('research/entries', []); // start empty (no old searches to convert)
 
-test('the shared page range: default 1–3, saved, checked', async () => {
-  assert.deepEqual(await config.readRange(), { fromPage: 1, toPage: 3 });
-  assert.deepEqual((await config.saveRange({ fromPage: 2, toPage: 4 })).range, { fromPage: 2, toPage: 4 });
-  assert.deepEqual(await config.readRange(), { fromPage: 2, toPage: 4 });
-  assert.match((await config.saveRange({ fromPage: 5, toPage: 2 })).error, /before/);
-  assert.match((await config.saveRange({ fromPage: 1, toPage: 15 })).error, /At most 10/);
-});
-
-test('a new row is read with the shared range; same link or search twice is refused', async () => {
-  const range = await config.readRange();
-  const a = entries.makeEntry({ platform: 'flipkart', category: 'Cotton Kurti', url: null }, [], range);
+test('a new row reads 100 products by default, no pages; same link or search twice is refused', async () => {
+  const a = entries.makeEntry({ platform: 'flipkart', category: 'Cotton Kurti', url: null }, []);
   assert.equal(a.entry.name, 'flipkart_cotton-kurti');
-  assert.deepEqual([a.entry.fromPage, a.entry.toPage], [2, 4]);
+  assert.equal(a.entry.targetProducts, 100);
+  assert.equal(a.entry.fromPage, undefined);
+  assert.doesNotMatch(a.entry.trackId, /-p\d/); // no pages in its data id
+  assert.equal(entries.jobOfEntry(a.entry).want, 100);
   await entries.updateEntries(() => [a.entry]);
   // Same market place + same category (any spacing / case), no link → same search.
-  assert.match(entries.makeEntry({ platform: 'flipkart', category: 'cotton  KURTI' }, [a.entry], range).error, /already exists/);
-});
-
-test('moving entries onto a new range — and back brings the old history back', async () => {
-  const [before] = await entries.readEntries();
-  await config.saveRange({ fromPage: 1, toPage: 2 });
-  const [moved] = await config.alignEntries([before.id], await config.readRange());
-  assert.deepEqual([moved.fromPage, moved.toPage], [1, 2]);
-  assert.notEqual(moved.trackId, before.trackId);
-  await config.saveRange({ fromPage: 2, toPage: 4 });
-  const [back] = await config.alignEntries([before.id], await config.readRange());
-  assert.equal(back.trackId, before.trackId); // the same saved data as before
+  assert.match(entries.makeEntry({ platform: 'flipkart', category: 'cotton  KURTI' }, [a.entry]).error, /already exists/);
 });
 
 test('categories: start from the entries’ own, any letter case is the same one', async () => {
@@ -57,7 +40,7 @@ test('categories: start from the entries’ own, any letter case is the same one
 test('editing a row: new name + new history when what it reads changes; checks like adding', async () => {
   const list = await entries.readEntries();
   const [e] = list;
-  const other = entries.makeEntry({ platform: 'amazon', category: 'earbuds' }, list, await config.readRange()).entry;
+  const other = entries.makeEntry({ platform: 'amazon', category: 'earbuds' }, list).entry;
   const all = [...list, other];
 
   const daily = entries.editEntry(e, { autoDaily: false }, all);
@@ -66,16 +49,21 @@ test('editing a row: new name + new history when what it reads changes; checks l
   assert.equal(daily.newHistory, false);
   assert.equal(daily.entry.trackId, e.trackId);
 
-  // Read every N days + products per page: saved, same history; bad numbers refused.
-  const numbers = entries.editEntry(e, { everyDays: 3, maxPerPage: '20' }, all);
-  assert.deepEqual([numbers.entry.everyDays, numbers.entry.autoDaily, numbers.entry.maxPerPage], [3, true, 20]);
+  // Read every N days + products to read: saved, same history; bad numbers refused.
+  const numbers = entries.editEntry(e, { everyDays: 3, targetProducts: '250' }, all);
+  assert.deepEqual([numbers.entry.everyDays, numbers.entry.autoDaily, numbers.entry.targetProducts], [3, true, 250]);
   assert.equal(numbers.entry.trackId, e.trackId);
-  assert.equal(entries.editEntry(e, { maxPerPage: '' }, all).entry.maxPerPage, null);
+  assert.equal(entries.jobOfEntry(numbers.entry).want, 250);
   assert.match(entries.editEntry(e, { everyDays: 400 }, all).error, /0 to 365/);
-  assert.match(entries.editEntry(e, { maxPerPage: -2 }, all).error, /1 to 500/);
-  const fresh = entries.makeEntry({ platform: 'meesho', category: 'sarees', everyDays: 7, maxPerPage: 30 }, all, await config.readRange()).entry;
-  assert.deepEqual([fresh.everyDays, fresh.autoDaily, fresh.maxPerPage], [7, true, 30]);
-  assert.equal(entries.jobOfEntry(fresh).maxPerPage, 30);
+  assert.match(entries.editEntry(e, { targetProducts: '' }, all).error, /1 to 1000/);
+  assert.match(entries.editEntry(e, { targetProducts: 2000 }, all).error, /1 to 1000/);
+  const fresh = entries.makeEntry({ platform: 'meesho', category: 'sarees', everyDays: 7, targetProducts: 60 }, all).entry;
+  assert.deepEqual([fresh.everyDays, fresh.autoDaily, fresh.targetProducts], [7, true, 60]);
+  // An entry made while the page range existed keeps its data id; with no
+  // number saved it reads the default.
+  const older = { ...e, targetProducts: undefined, fromPage: 1, toPage: 3, trackId: 'flipkart-cotton-kurti-abc-p3' };
+  assert.equal(entries.jobOfEntry(older).want, 100);
+  assert.equal(entries.editEntry(older, { targetProducts: 40 }, all).entry.trackId, 'flipkart-cotton-kurti-abc-p3');
 
   const moved = entries.editEntry(e, { category: 'Kurta Sets' }, all);
   assert.equal(moved.entry.name, 'flipkart_kurta-sets');

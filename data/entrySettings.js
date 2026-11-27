@@ -2,16 +2,27 @@
 // server (the real check — lib/research/entries.js, the cron) and the page
 // (the input boxes), so both always agree. Pure.
 //
-//   everyDays   read again by itself every N days: 0 = never by itself (only
-//               when Search is pressed), 1 = every day, 2 = every 2 days, …
-//   maxPerPage  keep only the first N products of every page read (ads don't
-//               count toward N); null = every product on the page.
+//   targetProducts  how many products a read collects. A read always starts
+//                   at page 1 and goes on to the next page by itself until it
+//                   has this many ranked products (ads don't count) — or the
+//                   results run out, or MAX_READ_PAGES pages have been read.
+//   everyDays       read again by itself every N days: 0 = never by itself
+//                   (only when Search is pressed), 1 = every day, 2 = every
+//                   2 days, …
 //
-// Entries saved before these existed have only `autoDaily` (true / false):
-// everyDaysOf reads that as 1 / 0.
+// Entries saved before these existed: no targetProducts → DEFAULT_TARGET;
+// only `autoDaily` (true / false) → everyDays 1 / 0.
 
+export const DEFAULT_TARGET = 100;
+export const MAX_TARGET = 1000;
+// A safety stop: one read never asks for more pages than this (each page is
+// one more paid request to the scraping service).
+export const MAX_READ_PAGES = 20;
 export const MAX_EVERY_DAYS = 365;
-export const MAX_PER_PAGE = 500;
+
+export function targetOf(entry) {
+  return Number.isInteger(entry?.targetProducts) && entry.targetProducts > 0 ? entry.targetProducts : DEFAULT_TARGET;
+}
 
 export function everyDaysOf(entry) {
   if (Number.isInteger(entry?.everyDays)) return entry.everyDays;
@@ -21,17 +32,16 @@ export function everyDaysOf(entry) {
 const whole = (v) => (typeof v === 'number' ? v : Number(String(v).trim()));
 
 // What was typed → { value } or { error } in plain words.
+export function readTarget(v) {
+  const n = v === '' || v == null ? NaN : whole(v);
+  if (!Number.isInteger(n) || n < 1 || n > MAX_TARGET) return { error: `Products to read: type a whole number from 1 to ${MAX_TARGET}` };
+  return { value: n };
+}
+
 export function readEveryDays(v) {
   if (v === '' || v == null) return { value: 0 };
   const n = whole(v);
   if (!Number.isInteger(n) || n < 0 || n > MAX_EVERY_DAYS) return { error: `Read every: type a whole number of days from 0 to ${MAX_EVERY_DAYS} (0 = only when you press Search)` };
-  return { value: n };
-}
-
-export function readMaxPerPage(v) {
-  if (v === '' || v == null || v === 0 || v === '0') return { value: null };
-  const n = whole(v);
-  if (!Number.isInteger(n) || n < 1 || n > MAX_PER_PAGE) return { error: `Products / Page: type a whole number from 1 to ${MAX_PER_PAGE}, or leave it empty for all` };
   return { value: n };
 }
 
@@ -43,5 +53,3 @@ export function isDue(entry, lastRunDate, today, daysSince) {
   if (!lastRunDate) return true;
   return daysSince(today, lastRunDate) >= every;
 }
-
-export const everyDaysText = (n) => (!n ? 'Off' : n === 1 ? 'Every day' : `Every ${n} days`);

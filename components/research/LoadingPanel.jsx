@@ -36,7 +36,9 @@ function JobRow({ job }) {
   let text;
   if (job.state === 'reading') {
     icon = <Loader2 size={15} className="animate-spin text-link" />;
-    text = job.page ? `Page ${job.page} of ${job.pages} read${job.added != null ? ` (+${job.added} new)` : ''} · ${products} so far` : 'Opening the first page…';
+    text = !job.page ? 'Opening the first page…'
+      : job.want ? `Page ${job.page} read${job.added != null ? ` (+${job.added} new)` : ''} · ${n} of ${job.want} products`
+        : `Page ${job.page} of ${job.pages} read${job.added != null ? ` (+${job.added} new)` : ''} · ${products} so far`;
   } else if (job.state === 'done') {
     icon = <CheckCircle2 size={15} className="text-[color:var(--move-up)]" />;
     text = `Done · ${products}`;
@@ -50,7 +52,9 @@ function JobRow({ job }) {
     icon = <CircleDashed size={15} className="text-subtle" />;
     text = 'Waiting…';
   }
-  const pct = job.state === 'reading' && job.pages ? Math.round((job.page / job.pages) * 100) : ['done', 'cached', 'failed'].includes(job.state) ? 100 : 0;
+  const pct = job.state === 'reading'
+    ? job.want ? Math.min(100, Math.round((n / job.want) * 100)) : job.pages ? Math.round((job.page / job.pages) * 100) : 0
+    : ['done', 'cached', 'failed'].includes(job.state) ? 100 : 0;
   return (
     <li className="flex flex-col gap-1">
       <div className="flex items-center gap-2 text-sm">

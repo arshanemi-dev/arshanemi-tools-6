@@ -25,8 +25,9 @@ const MAX_PICKED = 8; // the validated chart colour slots
 // page): Date / Excel / PDF, the cards, the line chart and the Products table
 // with Details. Ticking rows picks the chart's lines (else the top 8 by
 // rank). `entry` = the entry picked in the table; `reloadKey` changes after
-// a read so the view shows the fresh data.
-export default function EntryProductsView({ entry, reloadKey }) {
+// a read so the view shows the fresh data. `heading` = drawn in place of the
+// "Products of …" title (the Products tab puts its category picker there).
+export default function EntryProductsView({ entry, reloadKey, heading = null }) {
   const { addToast } = useToast();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -96,7 +97,7 @@ export default function EntryProductsView({ entry, reloadKey }) {
   return (
     <section className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2">
-        <h2 className="flex items-center gap-2 text-base font-semibold text-foreground"><ListOrdered size={17} className="text-accent" /> Products of <code className="rounded-md bg-card px-2 py-0.5">{entry.name}</code></h2>
+        {heading || <h2 className="flex items-center gap-2 text-base font-semibold text-foreground"><ListOrdered size={17} className="text-accent" /> Products of <code className="rounded-md bg-card px-2 py-0.5">{entry.name}</code></h2>}
         <div className="ml-auto flex flex-wrap items-center gap-2">
           <DateRangeFilter value={v.dateRange} onChange={v.setDateRange} />
           <IconButton icon={FileSpreadsheet} label="Excel" title="Download this table (filters and sort as shown) to Excel" onClick={() => doExport('xlsx')} disabled={!summaries.length} />
@@ -111,7 +112,7 @@ export default function EntryProductsView({ entry, reloadKey }) {
         <>
           <MarketplaceStatus search={data.search} status={data.status} />
           <KpiRow kpis={kpis} />
-          <GraphPanel metric={metric} onMetric={setMetric} range={range} onRange={setRange} series={series} days={days} pickedCount={tickedKeys.length} maxPicked={MAX_PICKED} />
+          {/* <GraphPanel metric={metric} onMetric={setMetric} range={range} onRange={setRange} series={series} days={days} pickedCount={tickedKeys.length} maxPicked={MAX_PICKED} /> */}
           <ResearchTable
             key={entry.id}
             columns={columns}

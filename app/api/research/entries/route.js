@@ -3,14 +3,15 @@ import { readListingUrl } from '@/data/marketplaces'
 import { adminOnly, isAdmin, signedIn } from '@/lib/research/access'
 import { makeEntry, readEntries, readUserDoc, updateEntries } from '@/lib/research/entries'
 import { entryStats, storageSummary } from '@/lib/research/cleanup'
-import { addCategory, readCategories, readRange } from '@/lib/research/config'
+import { addCategory, readCategories } from '@/lib/research/config'
 import { dueForRenewal, planStatus } from '@/lib/research/plans'
 import { coinsPerMonth } from '@/lib/research/price'
+import { targetOf } from '@/data/entrySettings'
 
 export const runtime = 'nodejs'
 
 // GET → every entry, for any signed-in user (login is required):
-//   { entries: [{ id, name, platform, category, kind, fromPage, toPage,
+//   { entries: [{ id, name, platform, category, kind, targetProducts,
 //     saved, status, paidUntil, autoRenew, locked }], myEntries, due,
 //     coinsPerMonth, isAdmin }
 //   saved     on this user's My Entries list (myEntries = those ids, in order)
@@ -20,9 +21,9 @@ export const runtime = 'nodejs'
 //             the page renews them (POST /api/research/my-entries/renew)
 //   coinsPerMonth  the live price of one entry for one month (0 = free)
 // A read never charges. The master admin sees every entry unlocked, free,
-// and also gets each entry's link, daily switch and stats (products, days,
-// lastRead, lastError), the storage summary, the shared page range and the
-// category list.
+// and also gets each entry's link, its two numbers and stats (products,
+// days, lastRead, lastError, lastRun), the storage summary and the category
+// list.
 export async function GET(req) {
   const { payload, res } = await signedIn(req)
   if (res) return res
@@ -32,17 +33,18 @@ export async function GET(req) {
   const myEntries = doc.myEntries.filter((id) => ids.has(id))
   const now = Date.now()
   if (isAdmin(payload)) {
-    const [withStats, storage, range, categories] = await Promise.all([entryStats(entries), storageSummary(), readRange(), readCategories()])
+    const [withStats, storage, categories] = await Promise.all([entryStats(entries), storageSummary(), readCategories()])
     return NextResponse.json({
       entries: withStats.map((e) => ({ ...e, saved: myEntries.includes(e.id), status: 'active', paidUntil: null, autoRenew: false, locked: false })),
-      myEntries, due: [], coinsPerMonth: 0, isAdmin: true, storage, range, categories,
+      myEntries, due: [], coinsPerMonth: 0, isAdmin: true, storage, categories,
     })
   }
   return NextResponse.json({
-    entries: entries.map(({ id, name, platform, category, kind, fromPage, toPage, createdAt }) => {
+    entries: entries.map((e) => {
+      const { id, name, platform, category, kind, createdAt } = e
       const plan = doc.plans[id]
       const status = planStatus(plan, now)
-      return { id, name, platform, category, kind, fromPage, toPage, createdAt, saved: myEntries.includes(id), status, paidUntil: plan?.paidUntil || null, autoRenew: !!plan?.autoRenew, locked: status !== 'active' }
+      return { id, name, platform, category, kind, targetProducts: kind === 'import' ? null : targetOf(e), createdAt, saved: myEntries.includes(id), status, paidUntil: plan?.paidUntil || null, autoRenew: !!plan?.autoRenew, locked: status !== 'active' }
     }),
     myEntries,
     due: dueForRenewal({ ...doc, myEntries }, now),
@@ -51,13 +53,13 @@ export async function GET(req) {
   })
 }
 
-// POST { platform, category, url?, everyDays?, maxPerPage? } — the master
-// admin adds an entry (a new row): name = "<marketplace>_<category>"
+// POST { platform, category, url?, targetProducts?, everyDays? } — the
+// master admin adds an entry (a new row): name = "<marketplace>_<category>"
 // (unique); `url` = the one category / search page to read (empty = the
-// marketplace's own search for the category); pages = the shared range;
-// everyDays = read again by itself every N days (default 1, 0 = only by
-// Search); maxPerPage = keep only the first N products of each page (empty =
-// all). Not read yet — Search reads it. Its category joins the category list.
+// marketplace's own search for the category); targetProducts = how many
+// products a read collects, from page 1 on (default 100); everyDays = read
+// again by itself every N days (default 1, 0 = only by Search). Not read yet
+// — Search reads it. Its category joins the category list.
 // → 201 { entry } | 400 { error }
 export async function POST(req) {
   const { res } = await adminOnly(req)
@@ -69,10 +71,9 @@ export async function POST(req) {
     if (read.error) return NextResponse.json({ error: read.error }, { status: 400 })
     url = read.url
   }
-  const range = await readRange()
   let made
   await updateEntries((list) => {
-    made = makeEntry({ ...body, url }, list, range)
+    made = makeEntry({ ...body, url }, list)
     return made.entry ? [made.entry, ...list] : list
   })
   if (made.error) return NextResponse.json({ error: made.error }, { status: 400 })

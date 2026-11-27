@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { adminOnly } from '@/lib/research/access'
 import { jobOfEntry, readEntries } from '@/lib/research/entries'
-import { alignEntries, readRange } from '@/lib/research/config'
 import { ensureJobs } from '@/lib/research/service'
 import { ndjson } from '@/lib/research/stream'
 
@@ -9,9 +8,8 @@ export const runtime = 'nodejs'
 export const maxDuration = 300
 
 // POST { ids: [entryId, …] } — the master admin's Search: read these
-// entries right now, with the shared page range (an entry last read with
-// other pages moves to it first — lib/research/config.js alignEntries) —
-// again even if already read today (today's snapshot is replaced).
+// entries right now — each from page 1 on until it has its Products to Read
+// — again even if already read today (today's snapshot is replaced).
 // Live stream (lib/research/stream.js):
 // { type: 'plan', jobs } · { type: 'progress', … } per entry · then
 // { type: 'result', data: { results: [{ id, name, products, error }] } }.
@@ -24,9 +22,8 @@ export async function POST(req) {
   const ids = (Array.isArray(body.ids) ? body.ids : []).filter((x) => typeof x === 'string')
   if (!ids.length) return NextResponse.json({ error: 'Tick at least one entry to search' }, { status: 400 })
   if (ids.length > MAX_AT_ONCE) return NextResponse.json({ error: `At most ${MAX_AT_ONCE} entries at once` }, { status: 400 })
-  const wanted = (await readEntries()).filter((e) => ids.includes(e.id) && e.kind !== 'import').map((e) => e.id)
-  if (!wanted.length) return NextResponse.json({ error: 'Nothing to search — imported sheets are updated by importing them again' }, { status: 400 })
-  const entries = await alignEntries(wanted, await readRange())
+  const entries = (await readEntries()).filter((e) => ids.includes(e.id) && e.kind !== 'import')
+  if (!entries.length) return NextResponse.json({ error: 'Nothing to search — imported sheets are updated by importing them again' }, { status: 400 })
 
   return ndjson(async (send) => {
     const jobs = entries.map(jobOfEntry)
@@ -34,7 +31,7 @@ export async function POST(req) {
     const results = await ensureJobs(jobs, { force: true, onProgress: (p) => send({ type: 'progress', ...p }) })
     send({
       type: 'result',
-      data: { results: results.map((r) => ({ id: entries.find((e) => e.trackId === r.id)?.id, name: r.label, platform: r.platform, products: Object.keys(r.track?.products || {}).length, error: r.error, blocked: r.blocked })) },
+      data: { results: results.map((r) => ({ id: entries.find((e) => e.trackId === r.id)?.id, name: r.label, platform: r.platform, products: r.track?.runs?.[0]?.count ?? 0, error: r.error, blocked: r.blocked })) },
     })
   })
 }

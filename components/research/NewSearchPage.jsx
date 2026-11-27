@@ -2,23 +2,20 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { CheckCircle2, ExternalLink, FileUp, Pencil, Plus, Save, Search, ShieldAlert, Trash2, TriangleAlert, X, XCircle } from 'lucide-react';
+import { CheckCircle2, ExternalLink, FileUp, Layers, ListOrdered, Pencil, Plus, Save, Search, ShieldAlert, Trash2, TriangleAlert, X, XCircle } from 'lucide-react';
 import { useToast } from '@/components/admin/Toast';
 import ConfirmDialog from '@/components/admin/ConfirmDialog';
 import { FileIconButton } from '@/components/dashboard/IconButton';
 import { useAdminEntries } from '@/lib/research/useAdminEntries';
 import { fmtDay, fmtInt } from '@/lib/research/format';
-import { MARKETPLACES, marketplaceName, readListingUrl } from '@/data/marketplaces';
+import { MARKETPLACES, marketplaceById, marketplaceName, readListingUrl } from '@/data/marketplaces';
 import { entryName } from '@/data/entryName';
-import { everyDaysOf, readEveryDays, readMaxPerPage } from '@/data/entrySettings';
+import { DEFAULT_TARGET, MAX_READ_PAGES, everyDaysOf, readEveryDays, readTarget, targetOf } from '@/data/entrySettings';
 import ResearchTable from './ResearchTable';
 import PlatformBadge from './PlatformBadge';
 import NumberCell from './NumberCell';
 import ComboBox from './ComboBox';
-import PageRangePicker from './PageRangePicker';
-import PageCounts from './PageCounts';
-import { hasPageProblem, pageCountsText, pageStates } from '@/lib/research/pageCounts';
-import LoadingPanel, { Skeleton } from './LoadingPanel';
+import LoadingPanel from './LoadingPanel';
 import EntryProductsView from './EntryProductsView';
 import AdminDataPanel from './AdminDataPanel';
 
@@ -28,22 +25,42 @@ const BTN = 'inline-flex h-7 items-center gap-1 rounded-full px-2.5 text-xs font
 // The word after a "Read every" box: 0 → "days · off", 1 → "day", 2 → "days".
 const daysWord = (n) => (n === 0 ? 'days · off' : n === 1 ? 'day' : 'days');
 
+// How an entry's last read went, in a few words (cleanup.js entryStats
+// lastRun) → { text, tone } or null (never read).
+function lastRunNote(r) {
+  const l = r.lastRun;
+  if (!l) return null;
+  const pages = l.scrolls ? `1 page, scrolled ${l.scrolls}×` : `${l.pages} page${l.pages === 1 ? '' : 's'}`;
+  if (l.stoppedBy === 'failed') return { text: l.count ? `${fmtInt(l.count)} read, then a page failed` : 'last read failed', tone: 'text-neg' };
+  if (l.stoppedBy === 'ended') return { text: `${fmtInt(l.count)} — the results ended (${pages})`, tone: 'text-subtle' };
+  if (l.stoppedBy === 'limit') return { text: l.scrolls ? `${fmtInt(l.count)} — scrolled as far as one read can (${pages})` : `${fmtInt(l.count)} — stopped at ${MAX_READ_PAGES} pages`, tone: 'text-[color:var(--status-warn)]' };
+  if (l.target != null && l.target !== targetOf(r)) return { text: `${fmtInt(l.count)} last time (asked ${fmtInt(l.target)}) — Search to use the new number`, tone: 'text-subtle' };
+  return { text: `${fmtInt(l.count)} from ${pages}`, tone: 'text-subtle' };
+}
+
 // The New Search page (/product-research/new-search) — the master admin
 // only. Nothing of it is drawn until the server has confirmed the role.
-// Everything happens in the entries table:
-//   [+ Add] [Pages From–To] [Search] [Delete ticked] … [Import Sheet]
+// Two tabs:
+//   Categories  the entries table (below), then All data (storage + the
+//               delete tools)
+//   Products    one category's cards and Products table, with a picker for
+//               which one; clicking a name in the Categories table opens
+//               it here. Drawn the first time it's opened, then kept (its
+//               filters stay when you switch back and forth).
+// A Search's live progress shows above both tabs.
+// The Categories table:
+//   [+ Add] [Search] [Delete ticked] … [Import Sheet]
 //   + Add puts an editable row on top: Market place and Category are
 //   searchable dropdowns (a new category: type it + Enter), the link,
-//   Products / Page and Read every N days, then Save / Close. Every row's
+//   Products to Read and Read every N days, then Save / Close. Every row's
 //   Actions: Edit (the row turns into the same inputs, Save / Close) and
 //   Delete. The two numbers can also be typed straight into any row (Enter
 //   saves):
-//     Products / Page  keep only the first N products of every page (empty =
-//                      all) — ranks stay the real place on the market place
-//     Read every       read again by itself every N days (0 = only Search)
-//   The Pages above are the ONE range every entry is read with — by Search
-//   (the ticked rows) and by the automatic reads. A name opens its products
-//   below.
+//     Products to Read  how many products a read collects — it starts at
+//                       page 1 and goes on to the next page by itself until
+//                       it has them (no pages to pick)
+//     Read every        read again by itself every N days (0 = only Search)
+//   Search reads the ticked rows now. A name opens its products below.
 export default function NewSearchPage({ signedIn }) {
   const { addToast } = useToast();
   const a = useAdminEntries({ signedIn, addToast });
@@ -51,7 +68,12 @@ export default function NewSearchPage({ signedIn }) {
   const [shownId, setShownId] = useState(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [confirm, setConfirm] = useState(null); // { ids, label }
-  const [editing, setEditing] = useState(null); // { id (NEW or an entry id), platform, category, url, everyDays, maxPerPage } — the two numbers as typed
+  const [editing, setEditing] = useState(null); // { id (NEW or an entry id), platform, category, url, targetProducts, everyDays } — the two numbers as typed
+  const [tab, setTab] = useState('categories'); // 'categories' | 'products'
+  const [productsOpened, setProductsOpened] = useState(false); // the Products tab is drawn from its first opening on
+  const openTab = (id) => { setTab(id); if (id === 'products') setProductsOpened(true); };
+  // A category's products, on the Products tab.
+  const openProducts = (id) => { setShownId(id); openTab('products'); };
 
   // The list, plus the category of the row being edited if it isn't in it.
   const editingCategory = editing?.category || '';
@@ -72,20 +94,20 @@ export default function NewSearchPage({ signedIn }) {
     const before = a.entries.find((e) => e.id === editing.id);
     const newHistory = !!before && (before.platform !== editing.platform || before.category !== editing.category.trim() || (before.url || '') !== (link?.url || editing.url.trim()));
     const every = readEveryDays(editing.everyDays);
-    const perPage = readMaxPerPage(editing.maxPerPage);
+    const target = readTarget(editing.targetProducts);
     return {
       name, nameTaken, linkError, newHistory, url: link?.url || '',
-      everyError: every.error || null, everyDays: every.value, perPageError: perPage.error || null, maxPerPage: perPage.value,
-      ok: !!name && !nameTaken && !linkError && !every.error && !perPage.error,
+      everyError: every.error || null, everyDays: every.value, targetError: target.error || null, targetProducts: target.value,
+      ok: !!name && !nameTaken && !linkError && !every.error && !target.error,
     };
   }, [editing, a.entries]);
 
-  const startAdd = () => { setEditing({ id: NEW, platform: null, category: '', url: '', everyDays: '1', maxPerPage: '' }); };
-  const startEdit = (e) => setEditing({ id: e.id, platform: e.platform, category: e.category, url: e.url || '', everyDays: String(everyDaysOf(e)), maxPerPage: e.maxPerPage ? String(e.maxPerPage) : '' });
+  const startAdd = () => { setEditing({ id: NEW, platform: null, category: '', url: '', targetProducts: String(DEFAULT_TARGET), everyDays: '1' }); };
+  const startEdit = (e) => setEditing({ id: e.id, platform: e.platform, category: e.category, url: e.url || '', targetProducts: String(targetOf(e)), everyDays: String(everyDaysOf(e)) });
   const set = (patch) => setEditing((cur) => ({ ...cur, ...patch }));
   const save = async () => {
     if (!check?.ok) return;
-    const row = { platform: editing.platform, category: editing.category.trim(), url: check.url, everyDays: check.everyDays, maxPerPage: check.maxPerPage };
+    const row = { platform: editing.platform, category: editing.category.trim(), url: check.url, targetProducts: check.targetProducts, everyDays: check.everyDays };
     if (editing.id === NEW) {
       const made = await a.add(row);
       if (made) { setEditing(null); setTicked((cur) => new Set(cur).add(made.id)); setShownId(made.id); }
@@ -98,14 +120,15 @@ export default function NewSearchPage({ signedIn }) {
   const rows = useMemo(() => a.entries.map((e) => ({ ...e, key: e.id, title: e.name })), [a.entries]);
   const pinned = editing?.id === NEW ? [{ key: NEW, id: NEW, name: '', title: 'new entry' }] : [];
   const shown = a.entries.find((e) => e.id === shownId) || a.entries[0] || null;
+  const entryOptions = useMemo(() => a.entries.map((e) => ({ value: e.id, label: e.name, color: marketplaceById(e.platform)?.color })), [a.entries]);
   const tickedIds = [...ticked].filter((id) => a.entries.some((e) => e.id === id && e.kind !== 'import'));
-  // Entries whose last Search had a page that failed or didn't load fully —
-  // one click ticks just these, so Search reads again only what needs it.
-  const needFix = useMemo(() => a.entries.filter((e) => e.kind !== 'import' && hasPageProblem(e)).map((e) => e.id), [a.entries]);
+  // Entries whose last read failed (a page couldn't be read) — one click
+  // ticks just these, so Search reads again only what needs it.
+  const needFix = useMemo(() => a.entries.filter((e) => e.kind !== 'import' && e.lastRun?.stoppedBy === 'failed').map((e) => e.id), [a.entries]);
   const isEdit = (r) => editing?.id === r.key;
   // A number typed straight into a row → checked, then saved (or why not).
   const saveNumber = (r, key, text) => {
-    const read = key === 'everyDays' ? readEveryDays(text) : readMaxPerPage(text);
+    const read = key === 'everyDays' ? readEveryDays(text) : readTarget(text);
     if (read.error) { addToast(read.error, 'error'); return; }
     a.setSetting(r, { [key]: read.value });
   };
@@ -121,7 +144,7 @@ export default function NewSearchPage({ signedIn }) {
             : <span className="inline-flex items-center gap-1 text-[11px] text-[color:var(--move-up)]"><CheckCircle2 size={12} /> {editing.id === NEW ? 'new' : 'ok'}</span>)}
         </span>
       ) : (
-        <button type="button" onClick={() => setShownId(r.id)} title="Show its products below" className={`font-semibold hover:underline ${r.id === shown?.id ? 'text-accent' : 'text-link'}`}>{r.name}</button>
+        <button type="button" onClick={() => openProducts(r.id)} title="Open its products (Products tab)" className={`font-semibold hover:underline ${r.id === shown?.id ? 'text-accent' : 'text-link'}`}>{r.name}</button>
       )),
     },
     {
@@ -156,36 +179,36 @@ export default function NewSearchPage({ signedIn }) {
         ? <a href={r.url} target="_blank" rel="noopener noreferrer" title={r.url} className="inline-flex max-w-[16rem] items-center gap-1 truncate text-xs text-link hover:underline"><span className="truncate">{r.url.replace(/^https:\/\/(www\.)?/, '')}</span><ExternalLink size={11} className="shrink-0" /></a>
         : <span className="text-xs text-subtle">{r.key === NEW ? '' : r.kind === 'import' ? 'imported sheet' : 'market place search'}</span>),
     },
-    { key: 'products', label: 'Products', numeric: true, value: (r) => r.products, text: (r) => (r.key === NEW ? '' : fmtInt(r.products)), total: 'sum', totalFormat: fmtInt },
     {
-      // Typed by the admin (data/entrySettings.js) — used from the next Search.
-      key: 'maxPerPage', label: 'Products / Page', numeric: true,
-      description: 'How many products Search keeps from every page: the first N (ads not counted). Empty = every product on the page. Ranks stay the real place on the market place. Type a number, then Enter — it’s used from the next Search.',
-      value: (r) => (r.key === NEW || r.kind === 'import' ? null : r.maxPerPage || null),
-      text: (r) => (r.kind === 'import' ? '-' : r.key === NEW ? '' : r.maxPerPage ? String(r.maxPerPage) : 'All'),
+      key: 'products', label: 'Products', numeric: true, value: (r) => r.products, text: (r) => (r.key === NEW ? '' : fmtInt(r.products)), total: 'sum', totalFormat: fmtInt,
+      description: 'Every different product this entry has saved, over all its days — one that has left the top of the list is still counted.',
+    },
+    {
+      // Typed by the admin (data/entrySettings.js) — used from the next read.
+      key: 'targetProducts', label: 'Products to Read', numeric: true,
+      description: `How many products a read collects. It starts at page 1 and goes on to the next page by itself until it has this many (ads not counted) — or the results end, or ${MAX_READ_PAGES} pages were read. Type a number, then Enter. Under it: how the last read went.`,
+      value: (r) => (r.key === NEW || r.kind === 'import' ? null : targetOf(r)),
+      text: (r) => (r.kind === 'import' ? '-' : r.key === NEW ? '' : String(targetOf(r))),
       render: (r) => {
         if (r.kind === 'import') return <span className="text-xs text-subtle">-</span>;
         if (isEdit(r)) {
           return (
             <span className="inline-flex flex-col items-start gap-0.5">
-              <NumberCell value={editing.maxPerPage} onChange={(maxPerPage) => set({ maxPerPage })} placeholder="All" min={1} label="Products to keep from every page (empty = all)" invalid={!!check?.perPageError} />
-              {check?.perPageError && <span className="max-w-[12rem] whitespace-normal text-[11px] text-neg">1–500, or empty for all</span>}
+              <NumberCell value={editing.targetProducts} onChange={(targetProducts) => set({ targetProducts })} suffix="products" min={1} label="How many products a read collects" invalid={!!check?.targetError} />
+              {check?.targetError && <span className="max-w-[12rem] whitespace-normal text-[11px] text-neg">1–1000</span>}
             </span>
           );
         }
-        return <NumberCell value={r.maxPerPage || ''} onCommit={(t) => saveNumber(r, 'maxPerPage', t)} placeholder="All" min={1} busy={a.saving.has(r.id) || !!editing} label={`Products ${r.name} keeps from every page (empty = all) — Enter saves`} />;
+        const note = lastRunNote(r);
+        return (
+          <span className="inline-flex flex-col items-start gap-0.5">
+            <NumberCell value={targetOf(r)} onCommit={(t) => saveNumber(r, 'targetProducts', t)} suffix="products" min={1} busy={a.saving.has(r.id) || !!editing} label={`How many products ${r.name} collects on a read — Enter saves`} />
+            {note && <span className={`max-w-[14rem] whitespace-normal text-[11px] ${note.tone}`} title={r.lastRun?.error || ''}>Last: {note.text}</span>}
+          </span>
+        );
       },
     },
-    {
-      // Filled in by Search itself — nothing to type (lib/research/pageCounts.js).
-      key: 'pageCounts', label: 'Found / Page', wrap: true,
-      description: 'What each page gave on the last Search: the new products it kept (a product already on an earlier page isn’t counted twice; at most Products / Page), then the total. Amber = a page that probably didn’t load fully; red = a page that couldn’t be read. Hover a page for listed / new / ads. Sorts by the total.',
-      value: (r) => (r.key === NEW ? null : pageStates(r)?.total ?? null),
-      text: (r) => (r.key === NEW ? '' : pageCountsText(r)),
-      total: 'sum', totalFormat: fmtInt,
-      render: (r) => (r.key === NEW ? <span className="text-xs text-subtle">filled in by Search</span> : <PageCounts entry={r} range={a.range} />),
-    },
-    { key: 'days', label: 'Days', numeric: true, value: (r) => r.days, text: (r) => (r.key === NEW ? '' : fmtInt(r.days)) },
+    { key: 'days', label: 'Learn Count', numeric: true, value: (r) => r.days, text: (r) => (r.key === NEW ? '' : fmtInt(r.days)) },
     {
       key: 'lastRead', label: 'Last Read', value: (r) => r.lastRead, text: (r) => (r.key === NEW ? '' : fmtDay(r.lastRead)),
       render: (r) => (r.key === NEW ? '' : (
@@ -248,6 +271,10 @@ export default function NewSearchPage({ signedIn }) {
   }
 
   const busy = !!a.busy;
+  const TABS = [
+    { id: 'categories', label: 'Categories', icon: Layers, count: a.entries.length },
+    { id: 'products', label: 'Products', icon: ListOrdered, count: null },
+  ];
   return (
     <main className="min-h-0 flex-1 overflow-y-auto">
       <div className="flex w-full flex-col gap-5 px-4 py-5 sm:px-6 lg:px-10">
@@ -256,50 +283,101 @@ export default function NewSearchPage({ signedIn }) {
           <p className="text-xs text-muted">Only you (master admin) see this page. Every signed-in user sees the entries on <Link href="/product-research" className="font-semibold text-link hover:underline">Product Research</Link>.</p>
         </div>
 
-        <section className="flex flex-col gap-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <button type="button" onClick={startAdd} disabled={!!editing || busy} className="inline-flex h-9 items-center gap-1.5 rounded-full bg-accent px-4 text-sm font-semibold text-white hover:bg-accent-hover disabled:opacity-45">
-              <Plus size={15} /> Add
-            </button>
-            <PageRangePicker value={a.range} onChange={a.setRange} />
-            <button type="button" disabled={!tickedIds.length || busy || !!editing} onClick={async () => { await a.run(tickedIds, `${tickedIds.length} ${tickedIds.length === 1 ? 'entry' : 'entries'}`); setReloadKey((k) => k + 1); }} className="inline-flex h-9 items-center gap-1.5 rounded-full bg-action px-4 text-sm font-semibold text-white hover:bg-action-hover disabled:opacity-40" title={tickedIds.length ? `Read the ${tickedIds.length} ticked now, pages ${a.range.fromPage}–${a.range.toPage}` : 'Tick rows to search them'}>
-              <Search size={15} /> Search{tickedIds.length ? ` (${tickedIds.length})` : ''}
-            </button>
-            {needFix.length > 0 && (
-              <button type="button" disabled={busy || !!editing} onClick={() => setTicked(new Set(needFix))} className="inline-flex h-9 items-center gap-1.5 rounded-full border border-[color:var(--status-warn)]/50 px-3 text-sm font-semibold text-[color:var(--status-warn)] hover:bg-[color:var(--status-warn)]/10 disabled:opacity-40" title="Tick only the entries whose last Search had a page that failed or didn’t load fully (see Products / Page) — then press Search to read them again">
-                <TriangleAlert size={14} /> Tick {needFix.length} with a bad page
+        {/* The two tabs */}
+        <div role="tablist" aria-label="New Search" className="flex items-center gap-1 border-b border-divider">
+          {TABS.map((t) => {
+            const on = tab === t.id;
+            const Icon = t.icon;
+            return (
+              <button
+                key={t.id}
+                type="button"
+                role="tab"
+                id={`tab-${t.id}`}
+                aria-selected={on}
+                aria-controls={`panel-${t.id}`}
+                onClick={() => openTab(t.id)}
+                className={`-mb-px inline-flex items-center gap-1.5 border-b-2 px-4 py-2 text-sm font-semibold transition-colors ${on ? 'border-accent text-foreground' : 'border-transparent text-muted hover:text-foreground'}`}
+              >
+                <Icon size={15} className={on ? 'text-accent' : ''} aria-hidden />
+                {t.label}
+                {t.count != null && <span className="rounded-full bg-card px-1.5 text-[11px] font-semibold tabular-nums text-muted">{t.count}</span>}
               </button>
-            )}
-            <button type="button" disabled={!ticked.size || busy || !!editing} onClick={() => setConfirm({ ids: [...ticked], label: `${ticked.size} entries` })} className="inline-flex h-9 items-center gap-1.5 rounded-full border border-neg/40 px-3 text-sm font-semibold text-neg hover:bg-neg/10 disabled:opacity-40">
-              <Trash2 size={14} /> Delete ticked
-            </button>
-            <span className="ml-auto" />
-            <FileIconButton icon={FileUp} label="Import Sheet" title="Add a sheet you already have as an entry — columns Link, Date, Price, Review, Rating, Ranking (Bought optional)" accept=".xlsx,.xls,.csv" multiple={false} tone="outline" onFiles={async (f) => { const e = await a.importFile(f[0]); if (e) setShownId(e.id); }} disabled={busy || !!editing} />
-          </div>
-          <p className="text-xs text-muted">
-            {a.entries.length ? `${a.entries.length} entries · ${a.entries.filter((e) => everyDaysOf(e) > 0 && e.kind !== 'import').length} read by themselves · ${needFix.length ? `${needFix.length} with a bad page · ` : ''}` : ''}
-            Every entry is read with pages {a.range.fromPage}–{a.range.toPage} (by Search and the automatic reads). Changing the pages starts a new history for an entry on its next read — switching back brings the old one back.
-          </p>
-        </section>
+            );
+          })}
+        </div>
 
+        {/* A Search's live progress — seen from either tab */}
         {a.progress && <LoadingPanel progress={a.progress} skeleton={false} />}
 
-        <ResearchTable
-          columns={columns}
-          rows={rows}
-          pinnedRows={pinned}
-          defaultSort={{ key: 'name', dir: 'asc' }}
-          emptyText="No entries yet — press Add to make the first one."
-          selectedKeys={new Set(tickedIds)}
-          onToggleRow={(id) => setTicked((cur) => { const n = new Set(cur); if (n.has(id)) n.delete(id); else n.add(id); return n; })}
-          onToggleAll={(ids) => setTicked((cur) => (ids.every((id) => cur.has(id)) ? new Set([...cur].filter((id) => !ids.includes(id))) : new Set([...cur, ...ids])))}
-          tickPurpose="to search or delete"
-          tickedSummary="ticked"
-        />
+        {/* Categories: the table, then All data */}
+        <div role="tabpanel" id="panel-categories" aria-labelledby="tab-categories" className={`${tab === 'categories' ? 'flex' : 'hidden'} flex-col gap-5`}>
+          <section className="flex flex-col gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <button type="button" onClick={startAdd} disabled={!!editing || busy} className="inline-flex h-9 items-center gap-1.5 rounded-full bg-accent px-4 text-sm font-semibold text-white hover:bg-accent-hover disabled:opacity-45">
+                <Plus size={15} /> Add
+              </button>
+              <button type="button" disabled={!tickedIds.length || busy || !!editing} onClick={async () => { await a.run(tickedIds, `${tickedIds.length} ${tickedIds.length === 1 ? 'entry' : 'entries'}`); setReloadKey((k) => k + 1); }} className="inline-flex h-9 items-center gap-1.5 rounded-full bg-action px-4 text-sm font-semibold text-white hover:bg-action-hover disabled:opacity-40" title={tickedIds.length ? `Read the ${tickedIds.length} ticked now — each until it has its Products to Read` : 'Tick rows to search them'}>
+                <Search size={15} /> Search{tickedIds.length ? ` (${tickedIds.length})` : ''}
+              </button>
+              {needFix.length > 0 && (
+                <button type="button" disabled={busy || !!editing} onClick={() => setTicked(new Set(needFix))} className="inline-flex h-9 items-center gap-1.5 rounded-full border border-[color:var(--status-warn)]/50 px-3 text-sm font-semibold text-[color:var(--status-warn)] hover:bg-[color:var(--status-warn)]/10 disabled:opacity-40" title="Tick only the entries whose last read failed (a page couldn’t be read) — then press Search to read them again">
+                  <TriangleAlert size={14} /> Tick {needFix.length} that failed
+                </button>
+              )}
+              <button type="button" disabled={!ticked.size || busy || !!editing} onClick={() => setConfirm({ ids: [...ticked], label: `${ticked.size} entries` })} className="inline-flex h-9 items-center gap-1.5 rounded-full border border-neg/40 px-3 text-sm font-semibold text-neg hover:bg-neg/10 disabled:opacity-40">
+                <Trash2 size={14} /> Delete ticked
+              </button>
+              <span className="ml-auto" />
+              <FileIconButton icon={FileUp} label="Import Sheet" title="Add a sheet you already have as an entry — columns Link, Date, Price, Review, Rating, Ranking (Bought optional)" accept=".xlsx,.xls,.csv" multiple={false} tone="outline" onFiles={async (f) => { const e = await a.importFile(f[0]); if (e) openProducts(e.id); }} disabled={busy || !!editing} />
+            </div>
+            <p className="text-xs text-muted">
+              {a.entries.length ? `${a.entries.length} entries · ${a.entries.filter((e) => everyDaysOf(e) > 0 && e.kind !== 'import').length} read by themselves · ${needFix.length ? `${needFix.length} failed last time · ` : ''}` : ''}
+              Every read starts at page 1 and goes on to the next page by itself until it has the entry’s Products to Read (at most {MAX_READ_PAGES} pages). Changing that number keeps the entry’s history. Click a name to see its products.
+            </p>
+          </section>
 
-        {shown ? <EntryProductsView entry={shown} reloadKey={reloadKey} /> : a.entries.length === 0 ? null : <Skeleton />}
+          <ResearchTable
+            columns={columns}
+            rows={rows}
+            pinnedRows={pinned}
+            defaultSort={{ key: 'name', dir: 'asc' }}
+            emptyText="No entries yet — press Add to make the first one."
+            selectedKeys={new Set(tickedIds)}
+            onToggleRow={(id) => setTicked((cur) => { const n = new Set(cur); if (n.has(id)) n.delete(id); else n.add(id); return n; })}
+            onToggleAll={(ids) => setTicked((cur) => (ids.every((id) => cur.has(id)) ? new Set([...cur].filter((id) => !ids.includes(id))) : new Set([...cur, ...ids])))}
+            tickPurpose="to search or delete"
+            tickedSummary="ticked"
+          />
 
-        <AdminDataPanel storage={a.storage} onChanged={a.reload} />
+          <AdminDataPanel storage={a.storage} onChanged={a.reload} />
+        </div>
+
+        {/* Products: one category's cards + Products table, picked here */}
+        {productsOpened && (
+          <div role="tabpanel" id="panel-products" aria-labelledby="tab-products" className={`${tab === 'products' ? 'flex' : 'hidden'} flex-col gap-4`}>
+            {shown ? (
+              <EntryProductsView
+                entry={shown}
+                reloadKey={reloadKey}
+                heading={(
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="flex items-center gap-1.5 text-sm font-semibold text-foreground"><ListOrdered size={16} className="text-accent" aria-hidden /> Products of</span>
+                    <div className="w-72 max-w-full">
+                      <ComboBox value={shown.id} onChange={(id) => id && setShownId(id)} options={entryOptions} placeholder="Pick a category…" label="Category whose products are shown" />
+                    </div>
+                  </div>
+                )}
+              />
+            ) : (
+              <div className="mx-auto flex w-full max-w-md flex-col items-center gap-3 rounded-2xl border border-divider bg-background p-6 text-center">
+                <Layers size={24} className="text-accent" />
+                <p className="text-sm text-muted">No categories yet — add one on the Categories tab, press Search, and its products show here.</p>
+                <button type="button" onClick={() => openTab('categories')} className="rounded-full bg-accent px-4 py-1.5 text-sm font-semibold text-white hover:bg-accent-hover">Go to Categories</button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <ConfirmDialog

@@ -68,15 +68,6 @@ export function productColumns({ onDetails }) {
     { key: 'bought', label: 'Bought / Month', numeric: true, value: (r) => r.bought, text: (r) => fmtBought(r.bought), total: 'sum', totalFormat: fmtBought,
       description: 'How many people bought it in the past month — Amazon’s own number (“1K+ bought in past month”), at least this many. Other market places don’t show it (-).',
       tone: (r) => (r.bought != null ? 'font-semibold text-foreground' : 'text-muted') },
-    ...WINDOWS.map((w) => ({
-      key: w.id, label: w.label, numeric: true,
-      description: `Places moved since ${w.label.toLowerCase()} ago: ▲ climbed, ▼ fell. "-" = not tracked that far back yet.`,
-      value: (r) => r.moves[w.id], text: (r) => fmtMove(r.moves[w.id]), tone: (r) => moveTone(r.moves[w.id]),
-    })),
-    { key: 'all', label: 'All Time', numeric: true, description: 'Places moved since it was first tracked.',
-      value: (r) => r.all, text: (r) => fmtMove(r.all), tone: (r) => moveTone(r.all) },
-    { key: 'best', label: 'Best Rank', numeric: true, value: (r) => r.bestRank, text: (r) => fmtRank(r.bestRank) },
-    { key: 'days', label: 'Days Tracked', numeric: true, value: (r) => r.daysTracked, text: (r) => fmtInt(r.daysTracked) },
     { key: 'firstSeen', label: 'First Seen', value: (r) => r.firstSeen, text: (r) => fmtDay(r.firstSeen) },
     {
       key: 'details', label: 'Details', value: () => '', text: () => '',

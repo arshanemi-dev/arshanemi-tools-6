@@ -48,6 +48,11 @@ export const MARKETPLACES = [
     // wall with a bypass that skips the browser — the page comes back before
     // the products load (tested 25 Nov 2026) and still costs 10 credits.
     avoid: ['scrapedo'],
+    // No real page 2: "?page=2" gives page 1 again (seen 26 Nov 2026 — the
+    // same 20 products, 0 new). More products load as you SCROLL, about
+    // `perLoad` at a time — so a read opens page 1 once and scrolls it
+    // (lib/scraper/runSearch.js, Firecrawl's browser).
+    scroll: { perLoad: 20 },
     searchUrl: (query, page) => `https://www.meesho.com/search?q=${q(query)}${page > 1 ? `&page=${page}` : ''}`,
   },
   {
@@ -138,31 +143,12 @@ export function listingLabel(url) {
   }
 }
 
-// The page range picker: any From / To up to MAX_PAGE, at most MAX_SPAN pages
-// in one search (each page is one more request to the marketplace).
-export const MAX_PAGE = 20;
-export const MAX_SPAN = 10;
-export const DEFAULT_RANGE = { fromPage: 1, toPage: 3 };
-
-// A search's / track's page range → { fromPage, toPage }. Entries saved before
-// ranges existed carry `pages` (= pages 1 to N).
+// A search's / track's page range → { fromPage, toPage } — older searches
+// and tracks only (entries now read from page 1 until they have their
+// Products to Read — data/entrySettings.js). Ones saved before ranges
+// existed carry `pages` (= pages 1 to N).
 export function pageRange(v) {
   const from = Math.round(Number(v?.fromPage)) || 1;
   const to = Math.round(Number(v?.toPage ?? v?.pages)) || from;
   return { fromPage: from, toPage: to };
 }
-
-// Is a picked range allowed? → null, or the reason it isn't (plain words).
-export function rangeProblem({ fromPage, toPage }) {
-  if (!Number.isInteger(fromPage) || !Number.isInteger(toPage) || fromPage < 1 || toPage < 1) return 'Pick a From page and a To page';
-  if (toPage < fromPage) return 'The To page can’t be before the From page';
-  if (toPage > MAX_PAGE) return `Pages go up to ${MAX_PAGE}`;
-  if (toPage - fromPage + 1 > MAX_SPAN) return `At most ${MAX_SPAN} pages in one search`;
-  return null;
-}
-
-// "page 4" / "pages 1–3"
-export const rangeLabel = (v) => {
-  const { fromPage, toPage } = pageRange(v);
-  return fromPage === toPage ? `page ${fromPage}` : `pages ${fromPage}–${toPage}`;
-};

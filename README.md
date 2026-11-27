@@ -37,31 +37,34 @@ With the header hidden (embedded), My Entries is reached from Entries ▾ › Ma
 | Fetch (browser headers, retries, robot-check detection, optional scraping API) | `lib/scraper/fetchPage.js` |
 | Generic extraction: embedded app-state JSON → JSON-LD → product-link cards | `lib/scraper/extract.js` |
 | One parser per marketplace (precise first, generic fallbacks) | `lib/scraper/platforms/*.js` |
-| Page range (From → To) → deduped, ranked list | `lib/scraper/runSearch.js`, `lib/scraper/rank.js` |
+| Read page by page until N products → deduped, ranked list | `lib/scraper/runSearch.js`, `lib/scraper/rank.js` |
 | Storage: shared tracks + daily history, user search lists, cron index | `lib/research/store.js` (Vercel Blob, or `./.data/` locally) |
 | Rank moves, review growth, status, chart series, KPIs (pure) | `lib/research/metrics.js` |
 | API | `app/api/research/*`, `app/api/cron/refresh` |
 | Pages | `app/product-research/{page,products/page,settings/page}.js` → `components/research/*` |
 
-**Pages.** Each search reads a range of result pages, From page … To page
-(up to page 20, at most 10 pages per search). Rank is the product's place in
-the whole listing: when the range starts after page 1, the pages before it
-are counted as full pages (Flipkart, 40 a page: page 3 starts at rank 81),
-and the page says so.
+**Products to Read.** Each entry on New Search has its own number N (default
+100, up to 1000). A read always starts at page 1 and goes on to page 2, 3, …
+by itself until it has N ranked products (ads don't count) — or the results
+run out, or 20 pages were read (a safety stop: each page is one paid request).
+Only the first N are kept, so ranks are 1 … N, the real place in the listing.
+Meesho has no real page 2 (more products load as you scroll), so for Meesho
+page 1 is opened once and Firecrawl's browser scrolls it about N ÷ 20 times
+(at most 24 scrolls ≈ 500 products, still 1 credit) — `scroll` in
+`data/marketplaces.js`, `MAX_SCROLLS` in `lib/scraper/fetchPage.js`.
+Changing N keeps the entry's history. Under each row's number the table says
+how the last read went (`100 from 3 pages`, `64 — the results ended`, `a page
+failed`); **Tick N that failed** ticks just the failed ones. There is no page
+range any more (entries made with one keep their saved data).
 
-**Products / Page.** Every Search records what each page gave (listed, new,
-ads). The New Search table shows it on every row, filled in by the Search
-itself: `p1 48 · p2 52 · p3 57 = 157` (the new products each page added, then
-the total). `ended` = the results ran out there, `–` = not read, red ✕ = the
-page couldn't be read, amber ⚠ = a page that listed under half of the fullest
-page while a later page still had more (it probably didn't load fully).
-**Tick N with a bad page** ticks just those entries, so Search reads again
-only what needs it. Rules: `lib/research/pageCounts.js`.
+**Read Every.** Each entry is read again by itself every N days (1 = daily,
+0 = only when Search is pressed). Rules: `data/entrySettings.js`.
 
-**Tracking.** A track = marketplace + keyword + page range, shared by every
+**Tracking.** A track = marketplace + keyword (or link), shared by every
 user who searches it (one scrape a day serves all). Each day's snapshot is
 stored per product (`rank, page, price, MRP, rating, reviews, ad`). Vercel
-Cron calls `/api/cron/refresh` daily (`vercel.json`); opening a search that
+Cron calls `/api/cron/refresh` daily (`vercel.json`) and reads the entries
+whose Read Every is due; opening a search that
 hasn't been read today also refreshes it (free).
 
 **Billing** (`data/billing.js`). Login is required and nothing is free —

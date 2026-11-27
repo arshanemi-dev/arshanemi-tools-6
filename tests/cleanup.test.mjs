@@ -45,16 +45,16 @@ test('old searches become entries the first time the list is read — same saved
 
 test('a new entry: name = marketplace_category, unique; the link must be that market place’s', async () => {
   const list = await entries.readEntries();
-  const ok = entries.makeEntry({ platform: 'meesho', category: '  Women Tops!! ', url: null, fromPage: 2, toPage: 4 }, list);
+  const ok = entries.makeEntry({ platform: 'meesho', category: '  Women Tops!! ', url: null }, list);
   assert.equal(ok.entry.name, 'meesho_women-tops');
   assert.equal(ok.entry.kind, 'search');
   assert.equal(ok.entry.autoDaily, true);
-  assert.match(ok.entry.trackId, /p2-4$/);
+  assert.match(ok.entry.trackId, /^meesho-women-tops-[0-9a-f]+$/); // what it reads — no pages
   assert.match(entries.makeEntry({ platform: 'flipkart', category: 'cotton kurti' }, list).error, /already exists/);
   assert.match(entries.makeEntry({ platform: 'flipkart', category: 'bottles', url: 'https://www.amazon.in/s?k=bottle' }, list).error, /isn’t a Flipkart page/);
   assert.match(entries.makeEntry({ platform: 'amazon', category: 'x' }, list).error, /2–80/);
   assert.match(entries.makeEntry({ category: 'kurti' }, list).error, /market place/);
-  const linked = entries.makeEntry({ platform: 'myntra', category: 'kurta sets', url: 'https://www.myntra.com/kurtas', fromPage: 1, toPage: 2 }, list);
+  const linked = entries.makeEntry({ platform: 'myntra', category: 'kurta sets', url: 'https://www.myntra.com/kurtas' }, list);
   assert.match(linked.error, /already reads this same link/); // myntra_kurtas reads that link
 });
 
@@ -92,19 +92,17 @@ test('the daily switch is kept, and stats show what an entry holds', async () =>
   assert.equal(withStats.lastRead, '2026-11-24');
 });
 
-test('stats carry the LATEST read’s page counts — even when that read failed on page 1', async () => {
-  const meta = { id: 'pc-track', platform: 'amazon', query: 'bottle', fromPage: 1, toPage: 2 };
+test('stats say how the LATEST read went — products got, pages read, why it stopped', async () => {
+  const meta = { id: 'pc-track', platform: 'amazon', query: 'bottle', want: 100 };
   const fake = { id: 'pc', kind: 'search', trackId: 'pc-track' };
-  await store.saveRun(meta, { ...run(product('P1', 1)), pageCounts: [{ page: 1, shown: 48, added: 48, ads: 2 }, { page: 2, shown: 48, added: 40, ads: 0 }] }, '2026-11-25');
+  await store.saveRun(meta, { ...run(product('P1', 1)), pagesRead: 3, stoppedBy: 'target' }, '2026-11-25');
   let [s] = await cleanup.entryStats([fake]);
-  assert.deepEqual(s.pageCounts.map((c) => c.added), [48, 40]);
-  assert.deepEqual(s.countedRange, { fromPage: 1, toPage: 2 });
-  // The next read is blocked on page 1: no counts — that is what shows now.
-  await store.saveRun(meta, { products: [], pagesRead: 0, pageCounts: [], failedAt: 1, error: 'Page 1: blocked' }, '2026-11-26');
+  assert.deepEqual(s.lastRun, { count: 1, pages: 3, scrolls: 0, target: 100, stoppedBy: 'target', error: null });
+  // The next read is blocked on page 1 — that is what shows now.
+  await store.saveRun(meta, { products: [], pagesRead: 0, stoppedBy: 'failed', error: 'Page 1: blocked' }, '2026-11-26');
   [s] = await cleanup.entryStats([fake]);
-  assert.deepEqual(s.pageCounts, []);
-  assert.equal(s.failedAt, 1);
-  assert.equal(s.countedError, 'Page 1: blocked');
+  assert.deepEqual(s.lastRun, { count: 0, pages: 0, scrolls: 0, target: 100, stoppedBy: 'failed', error: 'Page 1: blocked' });
+  assert.equal(s.lastError, 'Page 1: blocked');
 });
 
 test('clean up: saved data no entry uses goes, and the old search lists (saved entries + plans kept)', async () => {

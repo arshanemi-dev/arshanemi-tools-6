@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { ChevronDown, FileSpreadsheet, Layers, Lock } from 'lucide-react';
 import Popover from '@/components/dashboard/Popover';
 import { ListSearchBox, matchesSearch } from '@/components/dashboard/SearchChecklist';
-import { rangeLabel } from '@/data/marketplaces';
+import { targetOf } from '@/data/entrySettings';
 import { MAX_PICK } from '@/lib/research/myEntries';
 import PlatformBadge from './PlatformBadge';
 
@@ -81,7 +81,7 @@ function PickList({ searches, picked, onPick, close }) {
                     </span>
                     <span className="mt-0.5 flex items-center gap-1.5 text-[11px] text-subtle">
                       {s.platform && s.platform !== 'mixed' && <PlatformBadge platform={s.platform} />}
-                      {s.kind === 'import' ? 'Imported sheet' : rangeLabel(s)}
+                      {s.kind === 'import' ? 'Imported sheet' : `top ${targetOf(s)} products`}
                     </span>
                   </span>
                 </label>

@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { env } from '@/lib/env'
 import { jobOfEntry, readEntries } from '@/lib/research/entries'
-import { alignEntries, readRange } from '@/lib/research/config'
 import { readTrack } from '@/lib/research/store'
 import { ensureJobs } from '@/lib/research/service'
 import { daysBetweenISO, todayIST } from '@/lib/research/time'
@@ -25,16 +24,15 @@ export async function GET(req) {
   }
   const started = Date.now()
   const today = todayIST()
-  const autoIds = (await readEntries()).filter((e) => everyDaysOf(e) > 0 && e.kind !== 'import').map((e) => e.id)
-  // Every entry is read with the shared page range (lib/research/config.js).
-  const auto = autoIds.length ? await alignEntries(autoIds, await readRange()) : []
+  // Each is read from page 1 on until it has its Products to Read.
+  const auto = (await readEntries()).filter((e) => everyDaysOf(e) > 0 && e.kind !== 'import')
   const due = []
   for (const e of auto) if (isDue(e, (await readTrack(e.trackId))?.lastRunDate || null, today, daysBetweenISO)) due.push(e)
   const done = []
   for (const e of due) {
     if (Date.now() - started > BUDGET_MS) break
     const [r] = await ensureJobs([jobOfEntry(e)])
-    done.push({ name: e.name, products: Object.keys(r.track?.products || {}).length, error: r.error })
+    done.push({ name: e.name, products: r.track?.runs?.[0]?.count ?? 0, error: r.error })
   }
   return NextResponse.json({ today, automatic: auto.length, due: due.length, refreshed: done.length, left: due.length - done.length, done })
 }
