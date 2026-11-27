@@ -19,7 +19,7 @@ const TITLE = {
   list: () => 'Loading your searches',
 };
 
-function useSeconds(since) {
+export function useSeconds(since) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     if (!since) return undefined;
@@ -29,7 +29,9 @@ function useSeconds(since) {
   return since ? Math.max(0, Math.round((now - since) / 1000)) : 0;
 }
 
-function JobRow({ job }) {
+// One job's line. `showName` = always write its name (an entry's, e.g.
+// "meesho_blouse"), not only a pasted link's.
+export function JobRow({ job, showName = false }) {
   const n = job.products || 0;
   const products = `${n} product${n === 1 ? '' : 's'}`;
   let icon;
@@ -61,6 +63,7 @@ function JobRow({ job }) {
         {icon}
         <PlatformBadge platform={job.platform} />
         {/* A link job's own name ("Flipkart · women kurtas" → "women kurtas"); a keyword job's would only repeat the badge. */}
+        {showName && job.label && !job.label.includes(' · ') && <span className="min-w-0 truncate text-xs font-semibold text-foreground" title={job.label}>{job.label}</span>}
         {job.label?.includes(' · ') && <span className="min-w-0 truncate text-xs text-muted" title={job.label}>{job.label.split(' · ').slice(1).join(' · ')}</span>}
         <span className="ml-auto min-w-0 truncate text-xs text-muted" title={text}>{text}</span>
       </div>

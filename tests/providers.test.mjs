@@ -127,3 +127,48 @@ test('a disguised block ("Site Maintenance", tiny page) moves on to the next ser
   assert.equal(r.via, 'scrapedo');
   assert.deepEqual(calls.map((c) => c.who), ['firecrawl', 'scrapedo']);
 });
+
+test('Meesho (a browser page) gets twice the time: 90 s, not 45 s', async () => {
+  resetCredits();
+  const calls = fakeNetwork({ firecrawl: () => json(200, { success: true, data: { rawHtml: PAGE, metadata: { statusCode: 200 } } }) });
+  await fetchPage('https://www.meesho.com/search?q=x', { platform: 'meesho', js: true });
+  assert.equal(calls[0].body.timeout, 87000); // 90 s, less 3 s for our own wait
+  await fetchPage('https://www.flipkart.com/search?q=x', { platform: 'flipkart' });
+  assert.equal(calls[1].body.timeout, 42000); // a plain page: the usual 45 s
+});
+
+test('the LAST service times out → asked once more after a pause, and that can work', async () => {
+  resetCredits();
+  let n = 0;
+  const calls = fakeNetwork({
+    firecrawl: () => {
+      n += 1;
+      if (n === 1) throw new DOMException('The operation was aborted due to timeout', 'TimeoutError');
+      return json(200, { success: true, data: { rawHtml: PAGE, metadata: { statusCode: 200 } } });
+    },
+  });
+  const r = await fetchPage('https://www.meesho.com/search?q=x', { platform: 'meesho', js: true });
+  assert.equal(r.via, 'firecrawl');
+  assert.equal(calls.length, 2);
+});
+
+test('the last service can’t be reached twice → a plain-words error, no third try', async () => {
+  resetCredits();
+  const calls = fakeNetwork({ firecrawl: () => { throw new TypeError('fetch failed'); } });
+  await assert.rejects(fetchPage('https://www.meesho.com/search?q=x', { platform: 'meesho', js: true }), (err) => {
+    assert.match(err.message, /couldn’t connect to it \(fetch failed\) — asked again · Firecrawl: couldn’t connect/);
+    return true;
+  });
+  assert.equal(calls.length, 2);
+});
+
+test('a timeout with another service still to try → that service, no second try', async () => {
+  resetCredits();
+  const calls = fakeNetwork({
+    firecrawl: () => { throw new DOMException('timeout', 'TimeoutError'); },
+    scrapedo: () => html(200, PAGE),
+  });
+  const r = await fetchPage('https://www.flipkart.com/search?q=x', { platform: 'flipkart' });
+  assert.equal(r.via, 'scrapedo');
+  assert.deepEqual(calls.map((c) => c.who), ['firecrawl', 'scrapedo']);
+});

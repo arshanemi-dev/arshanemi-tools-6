@@ -60,6 +60,15 @@ range any more (entries made with one keep their saved data).
 **Read Every.** Each entry is read again by itself every N days (1 = daily,
 0 = only when Search is pressed). Rules: `data/entrySettings.js`.
 
+**Search runs in the background.** Pressing Search saves a run record
+(`research/run`) and answers at once; the reading goes on on the server
+(`after()` in `app/api/research/entries/run`, up to its `maxDuration`) and
+writes its progress into the record. The page shows it in a window (or a
+slim strip once closed), asks again every 3 s, and reloads the table when
+it ends — leaving the page changes nothing. One Search at a time; a run that
+goes silent for 2½ minutes (the server's time limit, a restart) shows as
+stopped, and what it read is kept. Code: `lib/research/backgroundRun.js`.
+
 **Tracking.** A track = marketplace + keyword (or link), shared by every
 user who searches it (one scrape a day serves all). Each day's snapshot is
 stored per product (`rank, page, price, MRP, rating, reviews, ad`). Vercel

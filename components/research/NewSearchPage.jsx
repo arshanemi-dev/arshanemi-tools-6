@@ -16,6 +16,7 @@ import PlatformBadge from './PlatformBadge';
 import NumberCell from './NumberCell';
 import ComboBox from './ComboBox';
 import LoadingPanel from './LoadingPanel';
+import { RunModal, RunStrip } from './RunModal';
 import EntryProductsView from './EntryProductsView';
 import AdminDataPanel from './AdminDataPanel';
 
@@ -47,7 +48,10 @@ function lastRunNote(r) {
 //               which one; clicking a name in the Categories table opens
 //               it here. Drawn the first time it's opened, then kept (its
 //               filters stay when you switch back and forth).
-// A Search's live progress shows above both tabs.
+// Search runs in the BACKGROUND on the server: a window shows its live
+// progress ("Run in background" closes it — a slim strip stays above the
+// tabs, with Show); the table updates by itself when it's done. The rows
+// being read can't be edited or deleted until then; one Search at a time.
 // The Categories table:
 //   [+ Add] [Search] [Delete ticked] … [Import Sheet]
 //   + Add puts an editable row on top: Market place and Category are
@@ -126,6 +130,9 @@ export default function NewSearchPage({ signedIn }) {
   // ticks just these, so Search reads again only what needs it.
   const needFix = useMemo(() => a.entries.filter((e) => e.kind !== 'import' && e.lastRun?.stoppedBy === 'failed').map((e) => e.id), [a.entries]);
   const isEdit = (r) => editing?.id === r.key;
+  // The entries the background Search is reading right now.
+  const readingIds = useMemo(() => new Set(a.running ? a.runDoc.entryIds || [] : []), [a.running, a.runDoc]);
+  const READING = 'Being read right now — wait for the Search to finish';
   // A number typed straight into a row → checked, then saved (or why not).
   const saveNumber = (r, key, text) => {
     const read = key === 'everyDays' ? readEveryDays(text) : readTarget(text);
@@ -199,7 +206,7 @@ export default function NewSearchPage({ signedIn }) {
             </span>
           );
         }
-        const note = lastRunNote(r);
+        const note = readingIds.has(r.id) ? { text: 'reading now…', tone: 'font-semibold text-link' } : lastRunNote(r);
         return (
           <span className="inline-flex flex-col items-start gap-0.5">
             <NumberCell value={targetOf(r)} onCommit={(t) => saveNumber(r, 'targetProducts', t)} suffix="products" min={1} busy={a.saving.has(r.id) || !!editing} label={`How many products ${r.name} collects on a read — Enter saves`} />
@@ -247,8 +254,8 @@ export default function NewSearchPage({ signedIn }) {
         </span>
       ) : (
         <span className="inline-flex items-center gap-1">
-          {r.kind !== 'import' && <button type="button" onClick={() => startEdit(r)} disabled={!!editing} className={`${BTN} border border-divider-light text-foreground hover:bg-card-hover`} title={editing ? 'Save or close the row being edited first' : 'Edit this row'}><Pencil size={12} /> Edit</button>}
-          <button type="button" onClick={() => setConfirm({ ids: [r.id], label: r.name })} disabled={!!editing} className={`${BTN} border border-neg/30 text-neg hover:bg-neg/10`}><Trash2 size={12} /> Delete</button>
+          {r.kind !== 'import' && <button type="button" onClick={() => startEdit(r)} disabled={!!editing || readingIds.has(r.id)} className={`${BTN} border border-divider-light text-foreground hover:bg-card-hover`} title={readingIds.has(r.id) ? READING : editing ? 'Save or close the row being edited first' : 'Edit this row'}><Pencil size={12} /> Edit</button>}
+          <button type="button" onClick={() => setConfirm({ ids: [r.id], label: r.name })} disabled={!!editing || readingIds.has(r.id)} title={readingIds.has(r.id) ? READING : undefined} className={`${BTN} border border-neg/30 text-neg hover:bg-neg/10`}><Trash2 size={12} /> Delete</button>
         </span>
       )),
     },
@@ -309,6 +316,7 @@ export default function NewSearchPage({ signedIn }) {
 
         {/* A Search's live progress — seen from either tab */}
         {a.progress && <LoadingPanel progress={a.progress} skeleton={false} />}
+        {a.running && !a.runOpen && <RunStrip run={a.runDoc} onShow={() => a.setRunOpen(true)} />}
 
         {/* Categories: the table, then All data */}
         <div role="tabpanel" id="panel-categories" aria-labelledby="tab-categories" className={`${tab === 'categories' ? 'flex' : 'hidden'} flex-col gap-5`}>
@@ -317,15 +325,15 @@ export default function NewSearchPage({ signedIn }) {
               <button type="button" onClick={startAdd} disabled={!!editing || busy} className="inline-flex h-9 items-center gap-1.5 rounded-full bg-accent px-4 text-sm font-semibold text-white hover:bg-accent-hover disabled:opacity-45">
                 <Plus size={15} /> Add
               </button>
-              <button type="button" disabled={!tickedIds.length || busy || !!editing} onClick={async () => { await a.run(tickedIds, `${tickedIds.length} ${tickedIds.length === 1 ? 'entry' : 'entries'}`); setReloadKey((k) => k + 1); }} className="inline-flex h-9 items-center gap-1.5 rounded-full bg-action px-4 text-sm font-semibold text-white hover:bg-action-hover disabled:opacity-40" title={tickedIds.length ? `Read the ${tickedIds.length} ticked now — each until it has its Products to Read` : 'Tick rows to search them'}>
-                <Search size={15} /> Search{tickedIds.length ? ` (${tickedIds.length})` : ''}
+              <button type="button" disabled={!tickedIds.length || busy || !!editing || a.running} onClick={() => a.run(tickedIds)} className="inline-flex h-9 items-center gap-1.5 rounded-full bg-action px-4 text-sm font-semibold text-white hover:bg-action-hover disabled:opacity-40" title={a.running ? 'A Search is running — one at a time (Show above to see it)' : tickedIds.length ? `Read the ${tickedIds.length} ticked in the background — each until it has its Products to Read` : 'Tick rows to search them'}>
+                <Search size={15} /> {a.running ? 'Searching…' : `Search${tickedIds.length ? ` (${tickedIds.length})` : ''}`}
               </button>
               {needFix.length > 0 && (
                 <button type="button" disabled={busy || !!editing} onClick={() => setTicked(new Set(needFix))} className="inline-flex h-9 items-center gap-1.5 rounded-full border border-[color:var(--status-warn)]/50 px-3 text-sm font-semibold text-[color:var(--status-warn)] hover:bg-[color:var(--status-warn)]/10 disabled:opacity-40" title="Tick only the entries whose last read failed (a page couldn’t be read) — then press Search to read them again">
                   <TriangleAlert size={14} /> Tick {needFix.length} that failed
                 </button>
               )}
-              <button type="button" disabled={!ticked.size || busy || !!editing} onClick={() => setConfirm({ ids: [...ticked], label: `${ticked.size} entries` })} className="inline-flex h-9 items-center gap-1.5 rounded-full border border-neg/40 px-3 text-sm font-semibold text-neg hover:bg-neg/10 disabled:opacity-40">
+              <button type="button" disabled={!ticked.size || busy || !!editing || [...ticked].some((id) => readingIds.has(id))} title={[...ticked].some((id) => readingIds.has(id)) ? READING : undefined} onClick={() => setConfirm({ ids: [...ticked], label: `${ticked.size} entries` })} className="inline-flex h-9 items-center gap-1.5 rounded-full border border-neg/40 px-3 text-sm font-semibold text-neg hover:bg-neg/10 disabled:opacity-40">
                 <Trash2 size={14} /> Delete ticked
               </button>
               <span className="ml-auto" />
@@ -359,7 +367,7 @@ export default function NewSearchPage({ signedIn }) {
             {shown ? (
               <EntryProductsView
                 entry={shown}
-                reloadKey={reloadKey}
+                reloadKey={reloadKey + a.runFinished}
                 heading={(
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="flex items-center gap-1.5 text-sm font-semibold text-foreground"><ListOrdered size={16} className="text-accent" aria-hidden /> Products of</span>
@@ -379,6 +387,8 @@ export default function NewSearchPage({ signedIn }) {
           </div>
         )}
       </div>
+
+      <RunModal run={a.runDoc} open={a.runOpen} onClose={() => a.setRunOpen(false)} />
 
       <ConfirmDialog
         open={!!confirm}
